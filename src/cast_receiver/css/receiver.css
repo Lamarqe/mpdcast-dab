@@ -1,0 +1,13 @@
+/**
+Cast receiver app intended for playing local media.
+*/
+
+body {
+  --playback-logo-image: url('res/favicon.ico');
+}
+
+cast-media-player {
+  --progress-color: rgb(0, 168, 255);
+  --splash-image: url('res/ha_wallpaper.png');
+  --splash-size: cover;
+}
