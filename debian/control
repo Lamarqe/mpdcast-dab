@@ -2,11 +2,11 @@ Source: mpdcast-dab
 Section: devel
 Priority: optional
 Maintainer:  Lamarqe <lamarqe@gmail.com>
-Build-Depends: git, cmake, build-essential, g++, pkg-config, python3-dev libfftw3-dev libfaad-dev librtlsdr-dev
+Build-Depends: git, cmake, build-essential, g++, pkg-config, python3-dev, libfftw3-dev, libfaad-dev, librtlsdr-dev
 Homepage: https://github.com/Lamarqe/mpdcast-dab
 
 Package: mpdcast-dab
 Architecture: any
-Depends: librtlsdr2 mpd python3-mpd python3-aiohttp python3-pychromecast
+Depends: librtlsdr2, mpd, python3-mpd, python3-aiohttp, python3-pychromecast
 Description: MPD to Google cast streaming application
  MPD to Google cast streaming application with support for DAB+ radio 
