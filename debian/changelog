@@ -1,0 +1,6 @@
+mpdcast-dab (1.0-0ppa0) noble; urgency=low
+
+  * Automated build of the github main branch.
+  * Please check the commit history at github.com for the list of current changes.
+
+ -- Lamarqe <lamarqe@gmail.com>  Sat, 01 Jun 2024 00:00:00 +0100
