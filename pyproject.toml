@@ -1,6 +1,38 @@
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mpdcast-dab"
+version = "1.0.0"
+dependencies = [
+  "mpd",
+	"aiohttp",
+	"pychromecast"
 ]
-build-backend = "setuptools.build_meta"
+requires-python = ">=3.11"
+authors = [
+  {name = "Lamarqe", email = "scritch@gmx.de"},
+]
+maintainers = [
+  {name = "Lamarqe", email = "scritch@gmx.de"},
+]
+description = "MPD to Google cast streaming application with support for DAB+ radio"
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["mpd", "chromecast", "dab+"]
+classifiers = [
+	Development Status :: 5 - Production/Stable
+	Intended Audience :: End Users/Desktop
+	Topic :: Multimedia :: Sound/Audio
+	License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)
+	Programming Language :: Python
+]
+
+[project.urls]
+Homepage = "https://github.com/Lamarqe/mpdcast-dab"
+Repository = "https://github.com/Lamarqe/mpdcast-dab.git"
+"Bug Tracker" = "https://github.com/Lamarqe/mpdcast-dab/issues"
+
+[project.scripts]
+mpdcast_dab = "cast_sender.__main__:main"
