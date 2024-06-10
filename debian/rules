@@ -2,24 +2,9 @@
 
 # secondly called by launchpad
 build:
-	mkdir build_example2
-	cd build_example2; cmake -DCMAKE_INSTALL_PREFIX=../debian/tmp/usr/bin -DRTLSDR=ON ../example-2
-	make -C build_example2
-	mkdir build_example3
-	cd build_example3; cmake -DCMAKE_INSTALL_PREFIX=../debian/tmp/usr/bin -DRTLSDR=ON ../example-3
-	make -C build_example3
-	mkdir build_example4
-	cd build_example4; cmake -DCMAKE_INSTALL_PREFIX=../debian/tmp/usr/bin -DRTLSDR=ON ../example-4
-	make -C build_example4
-	mkdir build_example5
-	cd build_example5; cmake -DCMAKE_INSTALL_PREFIX=../debian/tmp/usr/bin -DRTLSDR=ON ../example-5
-	make -C build_example5
-	mkdir build_example6
-	cd build_example6; cmake -DCMAKE_INSTALL_PREFIX=../debian/tmp/usr/bin -DRTLSDR=ON ../example-6
-	make -C build_example6
-	mkdir build_scanner
-	cd build_scanner; cmake -DCMAKE_INSTALL_PREFIX=../debian/tmp/usr/bin -DRTLSDR=ON ../dab-scanner
-	make -C build_scanner
+	mkdir build
+	cd build; cmake -DCMAKE_INSTALL_PREFIX=../debian/tmp/usr/bin ..
+	make -C build
 
 # thirdly called by launchpad
 binary: binary-indep binary-arch
@@ -28,24 +13,13 @@ binary-indep:
 	# nothing to be done
 
 binary-arch:
-	cd build_example2; cmake -P cmake_install.cmake
-	cd build_example3; cmake -P cmake_install.cmake
-	cd build_example4; cmake -P cmake_install.cmake
-	cd build_example5; cmake -P cmake_install.cmake
-	cd build_example6; cmake -P cmake_install.cmake
-	cd build_scanner; cmake -P cmake_install.cmake
+	cd build; cmake -P cmake_install.cmake
 	mkdir debian/tmp/DEBIAN
-	dpkg-gencontrol -pdab-cmdline
+	dpkg-gencontrol -pmpdcast-dab
 	dpkg --build debian/tmp ..
 
 # firstly called by launchpad
 clean:
 	rm -f build
-	rm -rf build_example2
-	rm -rf build_example3
-	rm -rf build_example4
-	rm -rf build_example5
-	rm -rf build_example6
-	rm -rf build_scanner
 
 .PHONY: binary binary-arch binary-indep clean
