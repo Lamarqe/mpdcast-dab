@@ -22,11 +22,11 @@ readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["mpd", "chromecast", "dab+"]
 classifiers = [
-	Development Status :: 5 - Production/Stable
-	Intended Audience :: End Users/Desktop
-	Topic :: Multimedia :: Sound/Audio
-	License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)
-	Programming Language :: Python
+	"Development Status :: 5 - Production/Stable",
+	"Intended Audience :: End Users/Desktop",
+	"Topic :: Multimedia :: Sound/Audio",
+	"License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+	"Programming Language :: Python"
 ]
 
 [project.urls]
