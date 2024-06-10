@@ -2,7 +2,7 @@ Source: mpdcast-dab
 Section: devel
 Priority: optional
 Maintainer:  Lamarqe <lamarqe@gmail.com>
-Build-Depends: git, cmake, build-essential, g++, pkg-config, dh-make, python3-dev, libfftw3-dev, libfaad-dev, librtlsdr-dev
+Build-Depends: git, cmake, build-essential, g++, pkg-config, dh-make, dh-python, python3-dev, libfftw3-dev, libfaad-dev, librtlsdr-dev
 Homepage: https://github.com/Lamarqe/mpdcast-dab
 
 Package: mpdcast-dab
