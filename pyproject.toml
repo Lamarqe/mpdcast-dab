@@ -41,7 +41,7 @@ mpdcast_dab = "cast_sender.__main__:main"
 sources = ["src"]
 packages = [
   "src/cast_sender",
-  "src/welle-python"
+  "src/welle-python",
   "build/libwelle_py.so"
 ]
 
