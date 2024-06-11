@@ -17,8 +17,6 @@ binary-indep:
 
 binary-arch:
 	dh $@ --with python3 --buildsystem=pybuild
-#	dpkg-gencontrol -pmpdcast-dab
-#	dpkg --build debian/tmp ..
 
 # firstly called by launchpad
 clean:
