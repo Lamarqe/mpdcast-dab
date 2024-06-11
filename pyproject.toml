@@ -45,7 +45,7 @@ packages = [
 ]
 
 [tool.hatch.build.targets.wheel.sources]
-"src" = "mpdcast_dab",
+"src" = "mpdcast_dab"
 "build" = "mpdcast_dab"
 
 [tool.hatch.build.targets.sdist]
