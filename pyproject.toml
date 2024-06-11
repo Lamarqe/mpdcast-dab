@@ -37,6 +37,12 @@ Repository = "https://github.com/Lamarqe/mpdcast-dab.git"
 [project.scripts]
 mpdcast_dab = "mpdcast_dab.cast_sender.__main__:main"
 
+[tool.hatch.build.targets.wheel]
+only-include = [
+  "src/cast_sender",
+  "src/welle-python"
+]
+
 [tool.hatch.build.targets.wheel.sources]
 "src" = "mpdcast_dab"
 
@@ -45,11 +51,6 @@ mpdcast_dab = "mpdcast_dab.cast_sender.__main__:main"
   
 
 [tool.hatch.build.targets.sdist]
-include = [
-  "src/cast_sender",
-  "src/welle-python"
-]
-
 exclude = [
   "*.h",
   "*.cpp"
