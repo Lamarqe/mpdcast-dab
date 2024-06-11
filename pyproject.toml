@@ -12,10 +12,10 @@ dependencies = [
 ]
 requires-python = ">=3.11"
 authors = [
-  {name = "Lamarqe", email = "scritch@gmx.de"},
+  {name = "Lamarqe", email = "scritch@gmx.de"}
 ]
 maintainers = [
-  {name = "Lamarqe", email = "scritch@gmx.de"},
+  {name = "Lamarqe", email = "scritch@gmx.de"}
 ]
 description = "MPD to Google cast streaming application with support for DAB+ radio"
 readme = "README.md"
