@@ -42,7 +42,7 @@ sources = ["src"]
 packages = [
   "src/cast_sender",
   "src/welle-python",
-  "build/libwelle_py.so = welle-python/libwelle_py.so"
+  "build/libwelle_py.so = welle-python"
 ]
 
 [tool.hatch.build.targets.sdist]
