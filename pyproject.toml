@@ -38,12 +38,15 @@ Repository = "https://github.com/Lamarqe/mpdcast-dab.git"
 mpdcast_dab = "cast_sender.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-sources = ["src" = "mpdcast-dab"]
 packages = [
   "src/cast_sender",
   "src/welle-python",
   "build/libwelle_py.so"
 ]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = "mpdcast_dab",
+"build" = "mpdcast_dab"
 
 [tool.hatch.build.targets.sdist]
 include = [
