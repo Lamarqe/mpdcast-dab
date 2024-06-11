@@ -39,7 +39,9 @@ mpdcast_dab = "cast_sender.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 artifacts = [
-  "build/libwelle_py.so",
-  "src/cast_sender/*.py",
-  "src/welle-python/*.py"
+  "src/cast_sender",
+  "src/welle-python"
+]
+packages = [
+  "build/libwelle_py.so"
 ]
