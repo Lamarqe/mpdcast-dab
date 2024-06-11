@@ -35,10 +35,10 @@ Repository = "https://github.com/Lamarqe/mpdcast-dab.git"
 "Bug Tracker" = "https://github.com/Lamarqe/mpdcast-dab/issues"
 
 [project.scripts]
-mpdcast_dab = "cast_sender.__main__:main"
+mpdcast_dab = "mpdcast_dab.cast_sender.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = [
+only-include = [
   "src/cast_sender",
   "src/welle-python",
   "build/libwelle_py.so"
