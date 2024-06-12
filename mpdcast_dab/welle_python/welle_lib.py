@@ -1,6 +1,6 @@
 import asyncio
 import datetime
-import libwelle_py as c_lib
+import mpdcast_dab.welle_python.libwelle_py as c_lib
 
 class UnsubscribedError(Exception):
   pass

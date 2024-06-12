@@ -11,11 +11,11 @@ import argparse
 import time
 import socket
 import time
-from local_media_player import LocalMediaPlayerController, APP_LOCAL
-import imageserver
-from cast_finder import CastFinder
-from tvheadend_connector import TvheadendChannel
-from dabserver_connector import DabserverStation
+from mpdcast_dab.cast_sender.local_media_player import LocalMediaPlayerController, APP_LOCAL
+import mpdcast_dab.cast_sender.imageserver as imageserver
+from mpdcast_dab.cast_sender.cast_finder import CastFinder
+from mpdcast_dab.cast_sender.tvheadend_connector import TvheadendChannel
+from mpdcast_dab.cast_sender.dabserver_connector import DabserverStation
 
 
 class MpdCaster(pychromecast.controllers.receiver.CastStatusListener, 

@@ -4,7 +4,7 @@
 import asyncio
 from aiohttp import web
 
-import welle_lib
+import mpdcast_dab.welle_python.welle_lib as welle_lib
 
 
 class DabServer():

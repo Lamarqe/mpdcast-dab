@@ -39,19 +39,8 @@ mpdcast_dab = "mpdcast_dab.cast_sender.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 only-include = [
-  "src/cast_sender",
-  "src/welle-python"
+  "mpdcast_dab"
 ]
-
-[tool.hatch.build.targets.wheel.sources]
-"src" = "mpdcast_dab"
 
 [tool.hatch.build.targets.wheel.force-include]
-"build/libwelle_py.so" = "mpdcast_dab/welle-python/libwelle_py.so"
-  
-
-[tool.hatch.build.targets.sdist]
-exclude = [
-  "*.h",
-  "*.cpp"
-]
+"build/libwelle_py.so" = "mpdcast_dab/welle_python/libwelle_py.so"

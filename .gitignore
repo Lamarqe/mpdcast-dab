@@ -6,7 +6,6 @@ CMakeFiles/
 cmake_install.cmake
 cmake_uninstall.cmake
 build/
-src/cast_sender/__pycache__/
-src/welle-python/__pycache__/
-src/welle-python/libwelle_py.so
-
+mpdcast_dab/cast_sender/__pycache__/
+mpdcast_dab/welle_python/__pycache__/
+mpdcast_dab/welle_python/libwelle_py.so

@@ -12,11 +12,13 @@ import time
 import threading
 import traceback
 
-import imageserver
-from mpd_caster import *
+if __name__ == '__main__':
+  sys.path.append(os.path.dirname(__file__)  + '/../..')
 
-sys.path.append(os.path.dirname(__file__)  + '/../welle-python')
-from dabserver import *
+import mpdcast_dab.cast_sender.imageserver as imageserver
+from mpdcast_dab.cast_sender.mpd_caster import *
+
+from mpdcast_dab.welle_python.dabserver import *
 
 def get_first_ipv4_address():
   for iface in ifaddr.get_adapters():

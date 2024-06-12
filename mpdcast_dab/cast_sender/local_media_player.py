@@ -1,6 +1,6 @@
 import requests
 from pychromecast.controllers.media import MediaController
-from web_sender_types import Image, MusicTrackMediaMetadata, MediaInfo, QueueItem, QueueUpdateItemsRequest
+from mpdcast_dab.cast_sender.web_sender_types import Image, MusicTrackMediaMetadata, MediaInfo, QueueItem, QueueUpdateItemsRequest
 
 APP_LOCAL = "D29D8DD1"
 
