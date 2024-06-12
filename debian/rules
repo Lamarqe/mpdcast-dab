@@ -16,7 +16,7 @@ binary-indep:
 	# nothing to be done
 
 binary-arch:
-	dh $@ --with python3 --buildsystem=pybuild
+	dh $@ --with python3,systemd --buildsystem=pybuild
 
 # firstly called by launchpad
 clean:
