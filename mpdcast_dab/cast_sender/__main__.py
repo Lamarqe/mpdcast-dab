@@ -47,7 +47,7 @@ def main():
 
   my_ip = get_first_ipv4_address()
   if not my_ip:
-    print ('could not retrieve local IP address')
+    print ('Fatal: could not retrieve local IP address')
     return
 
   mpdConfig = load_mpd_config(args['conf'])

@@ -1,6 +1,8 @@
 import json
 import aiohttp
 import yarl
+import logging
+logger = logging.getLogger(__name__)
 
 supported_stream_links = {'channelnumber': 'number', 'channelname': 'name', 'channel': 'uuid'}
 
@@ -16,7 +18,7 @@ class TvheadendChannel():
     self._channel_data = None
 
   async def initialize(self):
-    print('initializing tvheadend server')
+    logger.info('initializing tvheadend server')
     self._initialized = True
     channel_path_items = self.song_url.path_qs.split('/')
 

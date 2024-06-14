@@ -1,5 +1,8 @@
 import asyncio
 import datetime
+import logging
+logger = logging.getLogger(__name__)
+
 import mpdcast_dab.welle_python.libwelle_py as c_lib
 
 class UnsubscribedError(Exception):
@@ -45,21 +48,21 @@ class WavProgrammeHandler():
       return self._next_frame, audio_out
 
   async def new_picture(self):
-    print('waiting for new picture')
+    logger.debug('waiting for new picture')
     await self._picture_event.wait()
     if self._delete_in_progress:
       raise UnsubscribedError
     else:
-      print('forwarding new picture of type', self.picture['type'])
+      logger.debug('forwarding new picture of type', self.picture['type'])
       return self.picture
 
   async def new_label(self):
-    print('waiting for new label')
+    logger.debug('waiting for new label')
     await self._label_event.wait()
     if self._delete_in_progress:
       raise UnsubscribedError
     else:
-      print('forwarding new label')
+      logger.debug('forwarding new label')
       return self.label
 
   def _release_waiters(self):
@@ -236,7 +239,7 @@ class RadioController():
 
       # increase the counter of active subscriptions for the selected program
       programme_handler._subscribers += 1
-      print('subscribers:', programme_handler._subscribers)
+      logger.debug('subscribers:', programme_handler._subscribers)
       return programme_handler
 
 
@@ -261,7 +264,7 @@ class RadioController():
       return
 
     programme_handler._subscribers -= 1
-    print('subscribers:', programme_handler._subscribers)
+    logger.debug('subscribers:', programme_handler._subscribers)
     if programme_handler._subscribers == 0:
       c_lib.unsubscribe_program(self.c_impl, program_pid)
       self._programme_handlers[program_pid]._release_waiters()

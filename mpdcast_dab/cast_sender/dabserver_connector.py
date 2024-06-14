@@ -1,6 +1,8 @@
 import time
 import aiohttp
 import yarl
+import logging
+logger = logging.getLogger(__name__)
 
 class DabserverStation():
   """
@@ -15,7 +17,7 @@ class DabserverStation():
     self.label = ''
 
   async def initialize(self):
-    print('initializing dab server')
+    logger.info('initializing dab server')
     self._initialized = True
     channel_path_items = self.song_url.parts
 
@@ -31,14 +33,14 @@ class DabserverStation():
         async with aiohttp.ClientSession() as session:
           async with session.get(label_url, timeout=300) as label_response:
             self.label = await label_response.text()
-            print('return true')
+            logger.info('return true')
             return True
 
       except (aiohttp.client_exceptions.ServerDisconnectedError, TimeoutError):
-        print('return false, exception')
+        logger.info('return false, exception')
         return False
     else:
-      print('return false, not 4 items')
+      logger.info('return false, not 4 items')
       return False
     
   async def new_label(self):

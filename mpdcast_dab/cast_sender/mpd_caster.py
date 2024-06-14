@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# coding=utf-8
-
 import asyncio
 import re
 import tomllib
@@ -11,6 +8,9 @@ import argparse
 import time
 import socket
 import time
+import logging
+logger = logging.getLogger(__name__)
+
 from mpdcast_dab.cast_sender.local_media_player import LocalMediaPlayerController, APP_LOCAL
 import mpdcast_dab.cast_sender.imageserver as imageserver
 from mpdcast_dab.cast_sender.cast_finder import CastFinder
@@ -172,7 +172,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
           title = tvh_channel.name()
 
       elif (await dab_station.initialize()):
-        print('new DAB station')
+        logger.info('new DAB station')
         # New DAB station
         self._dabserver_current_station = dab_station
         title  = self._dabserver_current_station.station_name
@@ -188,21 +188,21 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
         if picture_dict:
           image_url = self.image_server.store_song_picture(song_file, picture_dict)
       except mpd.base.CommandError as exception:
-        print(exception)
+        logger.info(exception)
 
     if not title and 'name' in song_info:
       title = song_info['name']
 
     self.chromecast.wait()
-    print('update:',  title, artist, image_url)
+    logger.info('update:',  title, artist, image_url)
     self.controller.set_MusicTrackMediaMetadata(title, artist, image_url)
   
   def new_cast_status(self, status):
     if self.chromecast:
-      print ("Chromecast Session ID: " + str(self.chromecast.status.session_id))
+      logger.info ("Chromecast Session ID: " + str(self.chromecast.status.session_id))
     if self.controller:
-      print ("Controller Session ID: " + str(self.controller.status.media_session_id))
-    print ("Listener Session ID: " + str(status.session_id))
+      logger.info ("Controller Session ID: " + str(self.controller.status.media_session_id))
+    logger.info ("Listener Session ID: " + str(status.session_id))
 
   def new_connection_status(self, status):
     # Handle when the chromecast device gets shut down or loses network connection
@@ -237,7 +237,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
           processed_mpd_state = current_mpd_state
 
         if current_mpd_song != processed_mpd_song:
-          print('current_mpd_song:', current_mpd_song)
+          logger.info('current_mpd_song:', current_mpd_song)
           if current_mpd_song and current_mpd_state == "play":
             await self._handle_mpd_new_song(current_mpd_song)
             processed_mpd_song = current_mpd_song
@@ -248,7 +248,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self.mpd_client.disconnect()
 
 def load_mpd_config(config_filename):
-  print('Loading config from ' + config_filename)
+  logger.info('Loading config from ' + config_filename)
   cfg_file = open(config_filename, "r")
   confStr = cfg_file.read()
 

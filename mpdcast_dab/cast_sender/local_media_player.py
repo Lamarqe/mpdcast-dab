@@ -1,4 +1,7 @@
 import requests
+import logging
+logger = logging.getLogger(__name__)
+
 from pychromecast.controllers.media import MediaController
 from mpdcast_dab.cast_sender.web_sender_types import Image, MusicTrackMediaMetadata, MediaInfo, QueueItem, QueueUpdateItemsRequest
 
@@ -22,7 +25,7 @@ class LocalMediaPlayerController(MediaController):
       data={'localForwardURL': self.forward_url},
       headers={"Content-Type": "application/x-www-form-urlencoded"}
     ) as sidResponse:
-      print(sidResponse.text)
+      logger.info(sidResponse.text)
   
 
   def set_MusicTrackMediaMetadata(self, title=None, artist=None, image_url=None):
