@@ -113,8 +113,6 @@ class RadioController():
   PROGRAM_DISCOVERY_TIMEOUT = 10
   
   def __init__(self, gain=-1):
-#    test = c_lib.RadioController()
-#    test.WPH_Test()
     self.gain = gain    
     self.programs            = {}
     self._programme_handlers = {}
@@ -127,7 +125,7 @@ class RadioController():
 
     
   # Note: This method must not be called by __init__, as self cannot yet be used at this point
-  def init(self, device_name = "auto"):
+  def init_device(self, device_name = "auto"):
     self.c_impl = c_lib.init_device(self, device_name, self.gain)
 
   def onSNR(self, snr):

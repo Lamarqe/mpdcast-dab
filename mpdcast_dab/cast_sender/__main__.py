@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # coding=utf-8
 
+import io
 import os
 import sys
 import asyncio
@@ -8,6 +9,7 @@ import argparse
 import socket
 import ifaddr
 import time
+import logging
 
 import threading
 import traceback
@@ -15,6 +17,7 @@ import traceback
 if __name__ == '__main__':
   sys.path.append(os.path.dirname(__file__)  + '/../..')
 
+from mpdcast_dab.cast_sender.OutputGrabber import *
 import mpdcast_dab.cast_sender.imageserver as imageserver
 from mpdcast_dab.cast_sender.mpd_caster import *
 
@@ -33,6 +36,10 @@ async def setup_webserver(runner, port):
   await runner.setup()
   site = web.TCPSite(runner, '0.0.0.0', port)
   await site.start()
+
+def updateLoggerConfig():
+  logging.basicConfig(format='%(message)s', encoding='utf-8', level=logging.INFO, stream=sys.stdout, force=True)
+#  logging.basicConfig(encoding='utf-8', level=logging.INFO, stream=sys.stdout, force=True)
 
 def main():
   CAST_PATH = '/cast_receiver'
@@ -53,8 +60,24 @@ def main():
   mpdConfig = load_mpd_config(args['conf'])
   
   image_request_handler = imageserver.ImageRequestHandler(my_ip, WEB_PORT)
+  # In order to allow C console logs to be forwarded, it requires a message from C to stdout.
+	# This is why we create the DabServer already here (before setting up logging), 
+	# as it initializes the C lib and with it send some messages to stdout
   dab_server = DabServer(my_ip, WEB_PORT)
+
+  ##############################################################################
+  #why is the following call necessary?
+  #liba = ctypes.cdll.LoadLibrary('./libtest.dylib')
+  #liba.init()  # Will print at least one char via C to stdout
+  ##############################################################################
+  stdoutGrabber = OutputGrabber('c_stdout', sys.stdout)
+  stderrGrabber = OutputGrabber('c_stderr', sys.stderr)
+  sys.stdout = stdoutGrabber.redirect_stream()
+  sys.stderr = stderrGrabber.redirect_stream()
+  updateLoggerConfig()
   
+  dab_server.init_dab_device()
+
   web_app = web.Application()
   web_app.add_routes([web.static(CAST_PATH, '/usr/share/dab2chromecast/cast_receiver')])
   web_app.add_routes(image_request_handler.get_routes())
@@ -81,6 +104,8 @@ def main():
     mpd_caster.stop()
     loop.run_until_complete(runner.cleanup())
     loop.run_until_complete(dab_server.stop())
+    stdoutGrabber.cleanup()
+    stderrGrabber.cleanup()
 
 if __name__ == '__main__':
   main()

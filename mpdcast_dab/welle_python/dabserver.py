@@ -12,8 +12,10 @@ class DabServer():
     self.my_ip = my_ip
     self.port = port
     self.radio_controller = welle_lib.RadioController()
-    self.radio_controller.init()
     self.handlers = {}
+
+  def init_dab_device(self):
+    self.radio_controller.init_device()
 
   def get_routes(self):
     return [web.get(r'/stream/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_audio),

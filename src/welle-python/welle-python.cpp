@@ -529,59 +529,16 @@ static struct PyModuleDef welle_io = {
   NULL
 };
 
-/*
-
-static PyObject *
-WPH_Test(PythonRadioController *self, PyObject *Py_UNUSED(ignored))
-{
-  std::cout << "In WPH_Test in C" << std::endl;
-  Py_RETURN_NONE;
-}
-
-static PyMethodDef wph_methods[] = 
-{
-  {"WPH_Test", (PyCFunction) WPH_Test, METH_NOARGS, "Return the name, combining the first and last name"
-  },
-  {NULL}  // Sentinel 
-};
-
-typedef struct {
-    PyObject_HEAD
-    PythonRadioController* wph;
-} rc_wrapper;
-
-static PyTypeObject RadioControllerType = 
-{
-  PyVarObject_HEAD_INIT(NULL, 0)
-  .tp_name = "libwelle_py.RadioController",
-  .tp_basicsize = sizeof(rc_wrapper),
-//  .tp_dealloc = (destructor) Custom_dealloc,
-  .tp_itemsize = 0,
-  .tp_flags = Py_TPFLAGS_DEFAULT,
-  .tp_doc = PyDoc_STR("Custom objects"),
-  .tp_methods = wph_methods,
-//  .tp_members = Custom_members,
-//  .tp_init = (initproc) Custom_init,
-  .tp_new = PyType_GenericNew,
-};
-*/
 PyMODINIT_FUNC
 PyInit_libwelle_py (void) {
   PyObject *m;
-//  if (PyType_Ready(&RadioControllerType) < 0)
-//    return NULL;
 
   m = PyModule_Create(&welle_io);
   if (m == NULL)
     return NULL;
 	
-//  Py_INCREF(&RadioControllerType);
-//  if (PyModule_AddObject(m, "RadioController", (PyObject *) &RadioControllerType) < 0) 
-//  {
-//    Py_DECREF(&RadioControllerType);
-//    Py_DECREF(m);
-//    return NULL;
-//  }
-
+// Don't remove the verbose message below. Otherwise, redict of C stdout/stderr fails.
+// It requires at least one char to be printed from C to stdout before mpdcast_dab.cast_sender.OutputGrabber can be used
+	std::cout << "Successfully initialized C library." << std::endl;
   return m;
 }
