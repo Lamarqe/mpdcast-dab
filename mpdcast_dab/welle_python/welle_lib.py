@@ -53,7 +53,7 @@ class WavProgrammeHandler():
     if self._delete_in_progress:
       raise UnsubscribedError
     else:
-      logger.debug('forwarding new picture of type', self.picture['type'])
+      logger.debug('forwarding new picture of type %s', self.picture['type'])
       return self.picture
 
   async def new_label(self):
@@ -239,7 +239,7 @@ class RadioController():
 
       # increase the counter of active subscriptions for the selected program
       programme_handler._subscribers += 1
-      logger.debug('subscribers:', programme_handler._subscribers)
+      logger.debug('subscribers: %d', programme_handler._subscribers)
       return programme_handler
 
 
@@ -264,7 +264,7 @@ class RadioController():
       return
 
     programme_handler._subscribers -= 1
-    logger.debug('subscribers:', programme_handler._subscribers)
+    logger.debug('subscribers: %d', programme_handler._subscribers)
     if programme_handler._subscribers == 0:
       c_lib.unsubscribe_program(self.c_impl, program_pid)
       self._programme_handlers[program_pid]._release_waiters()

@@ -51,7 +51,7 @@ class DabServer():
   async def get_next_image(self, request):
     channel = request.match_info['channel']
     program = request.match_info['program'] 
-    logger.debug('get_next_image', channel, program)
+    logger.debug('get_next_image: channel: %s program: %s', channel, program)
     if program in self.handlers:
       try:
         image = await self.handlers[program].new_picture()
@@ -67,7 +67,7 @@ class DabServer():
   async def get_next_label(self, request):
     channel = request.match_info['channel']
     program = request.match_info['program'] 
-    logger.debug('get_next_label', channel, program)
+    logger.debug('get_next_label: channel: %s program: %s', channel, program)
     if program in self.handlers:
       try:
         label = await self.handlers[program].new_label()
@@ -82,7 +82,7 @@ class DabServer():
   async def get_current_image(self, request):
     channel = request.match_info['channel']
     program = request.match_info['program']  
-    logger.debug('get_current_image', channel, program)
+    logger.debug('get_current_image: channel: %s program: %s', channel, program)
     if (program in self.handlers and
         len(self.handlers[program].picture['data']) > 0):
         return web.Response(body = self.handlers[program].picture['data'],
@@ -95,7 +95,7 @@ class DabServer():
   async def get_current_label(self, request):
     channel = request.match_info['channel']
     program = request.match_info['program']  
-    logger.debug('get_current_label', channel, program)
+    logger.debug('get_current_label: channel: %s program: %s', channel, program)
     if program in self.handlers:
       return web.Response(text=self.handlers[program].label,
                           headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
@@ -108,7 +108,7 @@ class DabServer():
     program = request.match_info['program']  
     if program.startswith('cover.'):
       raise web.HTTPNotFound()
-    logger.info('new audio request for', program)
+    logger.info('new audio request for %s', program)
     
 
     handler = await self.radio_controller.subscribe_program(channel, program)

@@ -188,21 +188,21 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
         if picture_dict:
           image_url = self.image_server.store_song_picture(song_file, picture_dict)
       except mpd.base.CommandError as exception:
-        logger.info(exception)
+        logger.exception('Received exception from MPD')
 
     if not title and 'name' in song_info:
       title = song_info['name']
 
     self.chromecast.wait()
-    logger.info('update:',  title, artist, image_url)
+    logger.info('update details: title: %s artist: %s image_url: %s',  title, artist, image_url)
     self.controller.set_MusicTrackMediaMetadata(title, artist, image_url)
   
   def new_cast_status(self, status):
     if self.chromecast:
-      logger.info ("Chromecast Session ID: " + str(self.chromecast.status.session_id))
+      logger.info ("Chromecast Session ID: %s",  str(self.chromecast.status.session_id))
     if self.controller:
-      logger.info ("Controller Session ID: " + str(self.controller.status.media_session_id))
-    logger.info ("Listener Session ID: " + str(status.session_id))
+      logger.info ("Controller Session ID: %s", str(self.controller.status.media_session_id))
+    logger.info ("Listener Session ID: %s", str(status.session_id))
 
   def new_connection_status(self, status):
     # Handle when the chromecast device gets shut down or loses network connection
@@ -237,7 +237,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
           processed_mpd_state = current_mpd_state
 
         if current_mpd_song != processed_mpd_song:
-          logger.info('current_mpd_song:', current_mpd_song)
+          logger.info('current_mpd_song: %s', current_mpd_song)
           if current_mpd_song and current_mpd_state == "play":
             await self._handle_mpd_new_song(current_mpd_song)
             processed_mpd_song = current_mpd_song
@@ -248,7 +248,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self.mpd_client.disconnect()
 
 def load_mpd_config(config_filename):
-  logger.info('Loading config from ' + config_filename)
+  logger.info('Loading config from %s', config_filename)
   cfg_file = open(config_filename, "r")
   confStr = cfg_file.read()
 
