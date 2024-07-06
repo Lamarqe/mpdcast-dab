@@ -16,23 +16,6 @@ extern "C" {
   PyObject* PyInit_libwelle_py  (void);
 }
 
-class PythonLogger : public std::streambuf
-{
-  std::vector<char> myBuffer;
-protected:
-  int overflow( int ch ) override
-  {
-//    std::cout << ch;
-    myBuffer.push_back( ch );
-    if ( ch == '\n' ) {
-      std::cout << "From C: " << std::string (myBuffer.begin(), myBuffer.end());
-      myBuffer.clear();
-    }
-    //  return traits::eof() for failure...
-    return ch;
-  }
-};
-
 class WavProgrammeHandler: public ProgrammeHandlerInterface {
   PyObject_HEAD
 
@@ -592,10 +575,6 @@ PyInit_libwelle_py (void) {
   if (m == NULL)
     return NULL;
 	
-  PythonLogger* pythonLogger = new PythonLogger();
-  std::clog.rdbuf(pythonLogger);
-  std::cerr.rdbuf(pythonLogger);
-
 //  Py_INCREF(&RadioControllerType);
 //  if (PyModule_AddObject(m, "RadioController", (PyObject *) &RadioControllerType) < 0) 
 //  {
