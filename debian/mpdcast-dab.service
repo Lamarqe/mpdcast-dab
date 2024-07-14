@@ -3,7 +3,7 @@ Description=MPD to Google cast streaming application with support for DAB+ radio
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/mpdcast_dab
+ExecStart=/usr/bin/mpdcast_dab --quiet
 StandardOutput=inherit
 StandardError=inherit
 Restart=always
