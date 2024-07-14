@@ -17,7 +17,7 @@ import traceback
 if __name__ == '__main__':
   sys.path.append(os.path.dirname(__file__)  + '/../..')
 
-from mpdcast_dab.cast_sender.OutputGrabber import *
+from mpdcast_dab.cast_sender.output_grabber import *
 import mpdcast_dab.cast_sender.imageserver as imageserver
 from mpdcast_dab.cast_sender.mpd_caster import *
 
@@ -37,9 +37,14 @@ async def setup_webserver(runner, port):
   site = web.TCPSite(runner, '0.0.0.0', port)
   await site.start()
 
-def updateLoggerConfig():
-  logging.basicConfig(format='%(message)s', encoding='utf-8', level=logging.INFO, stream=sys.stdout, force=True)
-#  logging.basicConfig(encoding='utf-8', level=logging.INFO, stream=sys.stdout, force=True)
+def updateLoggerConfig(verbose):
+  internal_log_level = logging.INFO if verbose else logging.WARNING
+  external_log_level = logging.WARNING if verbose else logging.ERROR
+  logging.basicConfig(format='%(name)s - %(levelname)s: %(message)s', encoding='utf-8', level=internal_log_level, stream=sys.stdout, force=True)
+  logging.getLogger("aiohttp").setLevel(external_log_level)
+  logging.getLogger("pychromecast").setLevel(external_log_level)
+  logging.getLogger("zeroconf").setLevel(external_log_level)
+  logging.getLogger("Welle.io").setLevel(external_log_level)
 
 def main():
   CAST_PATH = '/cast_receiver'
@@ -61,20 +66,15 @@ def main():
   
   image_request_handler = imageserver.ImageRequestHandler(my_ip, WEB_PORT)
   # In order to allow C console logs to be forwarded, it requires a message from C to stdout.
-	# This is why we create the DabServer already here (before setting up logging), 
-	# as it initializes the C lib and with it send some messages to stdout
+  # This is why we create the DabServer already here (before setting up logging), 
+  # as it initializes the C lib and with it send some messages to stdout
   dab_server = DabServer(my_ip, WEB_PORT)
 
-  ##############################################################################
-  #why is the following call necessary?
-  #liba = ctypes.cdll.LoadLibrary('./libtest.dylib')
-  #liba.init()  # Will print at least one char via C to stdout
-  ##############################################################################
-  stdoutGrabber = OutputGrabber('c_stdout', sys.stdout)
-  stderrGrabber = OutputGrabber('c_stderr', sys.stderr)
-  sys.stdout = stdoutGrabber.redirect_stream()
-  sys.stderr = stderrGrabber.redirect_stream()
-  updateLoggerConfig()
+  stdout_grabber = OutputGrabber(sys.stdout, 'Welle.io', logging.Logger.error)
+  stderr_grabber = OutputGrabber(sys.stderr, 'Welle.io', logging.Logger.warning)
+  sys.stdout = stdout_grabber.redirect_stream()
+  sys.stderr = stderr_grabber.redirect_stream()
+  updateLoggerConfig(args['verbose'])
   
   dab_server.init_dab_device()
 
@@ -104,8 +104,8 @@ def main():
     mpd_caster.stop()
     loop.run_until_complete(runner.cleanup())
     loop.run_until_complete(dab_server.stop())
-    stdoutGrabber.cleanup()
-    stderrGrabber.cleanup()
+    stdout_grabber.cleanup()
+    stderr_grabber.cleanup()
 
 if __name__ == '__main__':
   main()
