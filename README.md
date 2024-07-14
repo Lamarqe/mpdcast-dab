@@ -27,7 +27,7 @@ The command-line parameters are:
 
 Parameter | Description | Default Value
 ------ | ---------- | ---------- 
---silent | Print errors only | False (True when running as systemd service) 
+--quiet | Print errors only | False (True when running as systemd service) 
 --conf | Show version | /etc/mpd.conf
 
 Supported Hardware
