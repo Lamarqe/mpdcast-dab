@@ -1,0 +1,103 @@
+#EXTM3U
+#EXTINF:-1,BAYERN 3
+http://127.0.0.1:8080/stream/11D/BAYERN%203
+#EXTINF:-1,ANTENNE BAYERN
+http://127.0.0.1:8080/stream/11D/ANTENNE%20BAYERN
+#EXTINF:-1,GONG NUERNBERG
+http://127.0.0.1:8080/stream/10C/GONG%20NUERNBERG
+#EXTINF:-1,ENERGY NUERNBERG
+http://127.0.0.1:8080/stream/10C/ENERGY%20NUERNBERG
+#EXTINF:-1,LIEBLINGSRADIO
+http://127.0.0.1:8080/stream/10C/LIEBLINGSRADIO
+#EXTINF:-1,HIT RADIO N1
+http://127.0.0.1:8080/stream/10C/HIT%20RADIO%20N1
+#EXTINF:-1,RADIO F
+http://127.0.0.1:8080/stream/10C/RADIO%20F
+#EXTINF:-1,98.6 charivari
+http://127.0.0.1:8080/stream/10C/98.6%20charivari
+#EXTINF:-1,Freies Radio Z
+http://127.0.0.1:8080/stream/10C/Freies%20Radio%20Z
+#EXTINF:-1,STAR FM
+http://127.0.0.1:8080/stream/10C/STAR%20FM
+#EXTINF:-1,max neo
+http://127.0.0.1:8080/stream/10C/max%20neo
+#EXTINF:-1,MEGARADIOmix
+http://127.0.0.1:8080/stream/10C/MEGARADIOmix
+#EXTINF:-1,PIRATE RADIO
+http://127.0.0.1:8080/stream/10C/PIRATE%20RADIO
+#EXTINF:-1,90..4Beat
+http://127.0.0.1:8080/stream/10C/90..4Beat
+#EXTINF:-1,BAYERN 1 Nby/Opf
+http://127.0.0.1:8080/stream/11D/BAYERN%201%20Nby%2fOpf
+#EXTINF:-1,Bayern 2 Sued
+http://127.0.0.1:8080/stream/11D/Bayern%202%20Sued
+#EXTINF:-1,BR-KLASSIK
+http://127.0.0.1:8080/stream/11D/BR-KLASSIK
+#EXTINF:-1,BR24
+http://127.0.0.1:8080/stream/11D/BR24
+#EXTINF:-1,BR24live
+http://127.0.0.1:8080/stream/11D/BR24live
+#EXTINF:-1,BR Schlager
+http://127.0.0.1:8080/stream/11D/BR%20Schlager
+#EXTINF:-1,PULS
+http://127.0.0.1:8080/stream/11D/PULS
+#EXTINF:-1,BR Heimat
+http://127.0.0.1:8080/stream/11D/BR%20Heimat
+#EXTINF:-1,ROCK ANTENNE
+http://127.0.0.1:8080/stream/5D/ROCK%20ANTENNE
+#EXTINF:-1,Dlf
+http://127.0.0.1:8080/stream/5C/Dlf
+#EXTINF:-1,Dlf Kultur
+http://127.0.0.1:8080/stream/5C/Dlf%20Kultur
+#EXTINF:-1,Dlf Nova
+http://127.0.0.1:8080/stream/5C/Dlf%20Nova
+#EXTINF:-1,DRadio DokDeb
+http://127.0.0.1:8080/stream/5C/DRadio%20DokDeb
+#EXTINF:-1,ERF Plus
+http://127.0.0.1:8080/stream/5C/ERF%20Plus
+#EXTINF:-1,Absolut relax
+http://127.0.0.1:8080/stream/5C/Absolut%20relax
+#EXTINF:-1,ENERGY
+http://127.0.0.1:8080/stream/5C/ENERGY
+#EXTINF:-1,SCHLAGERPARADIES
+http://127.0.0.1:8080/stream/5C/SCHLAGERPARADIES
+#EXTINF:-1,Schwarzwaldradio
+http://127.0.0.1:8080/stream/5C/Schwarzwaldradio
+#EXTINF:-1,SUNSHINE LIVE
+http://127.0.0.1:8080/stream/5C/SUNSHINE%20LIVE
+#EXTINF:-1,RADIO BOB!
+http://127.0.0.1:8080/stream/5C/RADIO%20BOB!
+#EXTINF:-1,KLASSIK RADIO
+http://127.0.0.1:8080/stream/5C/KLASSIK%20RADIO
+#EXTINF:-1,radio horeb
+http://127.0.0.1:8080/stream/5C/radio%20horeb
+#EXTINF:-1,Absolut HOT
+http://127.0.0.1:8080/stream/5D/Absolut%20HOT
+#EXTINF:-1,Absolut TOP
+http://127.0.0.1:8080/stream/5D/Absolut%20TOP
+#EXTINF:-1,Absolut BELLA
+http://127.0.0.1:8080/stream/5D/Absolut%20BELLA
+#EXTINF:-1,Absolut OLDIE
+http://127.0.0.1:8080/stream/5D/Absolut%20OLDIE
+#EXTINF:-1,OLDIE ANTENNE
+http://127.0.0.1:8080/stream/5D/OLDIE%20ANTENNE
+#EXTINF:-1,RTL RADIO
+http://127.0.0.1:8080/stream/5D/RTL%20RADIO
+#EXTINF:-1,TOGGO Radio
+http://127.0.0.1:8080/stream/5D/TOGGO%20Radio
+#EXTINF:-1,80s80s
+http://127.0.0.1:8080/stream/5D/80s80s
+#EXTINF:-1,NOSTALGIE
+http://127.0.0.1:8080/stream/5D/NOSTALGIE
+#EXTINF:-1,DRIVERS RADIO
+http://127.0.0.1:8080/stream/5D/DRIVERS%20RADIO
+#EXTINF:-1,Beats Radio
+http://127.0.0.1:8080/stream/5D/Beats%20Radio
+#EXTINF:-1,Brillux Radio
+http://127.0.0.1:8080/stream/5D/Brillux%20Radio
+#EXTINF:-1,90s90s
+http://127.0.0.1:8080/stream/5D/90s90s
+#EXTINF:-1,AIDAradio
+http://127.0.0.1:8080/stream/5D/AIDAradio
+#EXTINF:-1,Absolut GERMANY
+http://127.0.0.1:8080/stream/5D/Absolut%20GERMANY
