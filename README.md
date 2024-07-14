@@ -25,10 +25,10 @@ Usage
 =====
 The command-line parameters are:
 
-Parameter | Description
------- | ----------
--h, --help | Show help 
--v, --version | Show version 
+Parameter | Description | Default Value
+------ | ---------- | ---------- 
+--silent | Print errors only | False (True when running as systemd service) 
+--conf | Show version | /etc/mpd.conf
 
 Supported Hardware
 ====================
@@ -74,12 +74,12 @@ mkdir build
 cd build
 cmake ..
 make -j3
+cd ..
+cp build/libwelle_py.so mpdcast_dab/welle_python
 ```
 
-5. Install it
+5. Run MpdCast DAB and enjoy it
 
 ```
-sudo make install
+sudo ./mpdcast_dab/cast_sender/__main__.py
 ```
-
-6. Run MpdCast DAB and enjoy it
