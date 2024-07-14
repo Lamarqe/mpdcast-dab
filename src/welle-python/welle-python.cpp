@@ -26,7 +26,6 @@ class WavProgrammeHandler: public ProgrammeHandlerInterface {
 
     WavProgrammeHandler(PyObject* pythonObj): pool(1)
     {
-      std::cout << "Creating WavProgrammeHandler in C" << std::endl;
       this->python_impl = pythonObj;
       Py_XINCREF (python_impl);
     }
@@ -538,7 +537,7 @@ PyInit_libwelle_py (void) {
     return NULL;
 	
 // Don't remove the verbose message below. Otherwise, redict of C stdout/stderr fails.
-// It requires at least one char to be printed from C to stdout before mpdcast_dab.cast_sender.OutputGrabber can be used
+// At least one char must be printed from C to stdout before mpdcast_dab.cast_sender.OutputGrabber can be used
 	std::cout << "Successfully initialized C library." << std::endl;
   return m;
 }
