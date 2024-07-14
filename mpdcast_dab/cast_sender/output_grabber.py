@@ -28,7 +28,6 @@ class OutputGrabber:
       data = char.decode()
       if data == '\n':
         self._log_method(self._logger, captured_stream)
-#        self._logger.info(captured_stream)
         captured_stream = ''
       else:
         captured_stream += data
