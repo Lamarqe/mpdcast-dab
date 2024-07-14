@@ -79,7 +79,7 @@ def main():
   dab_server.init_dab_device()
 
   web_app = web.Application()
-  web_app.add_routes([web.static(CAST_PATH, '/usr/share/dab2chromecast/cast_receiver')])
+  web_app.add_routes([web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
   web_app.add_routes(image_request_handler.get_routes())
   web_app.add_routes(dab_server.get_routes())
   runner = web.AppRunner(web_app)
