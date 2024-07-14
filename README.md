@@ -17,6 +17,8 @@ Download
 ========
 ### Stable binaries
 * **Debian** or **Ubuntu** 24.04+
+  * `add-apt-repository ppa:lamarqe/ppa`
+  * `apt update`
   * `apt install mpdcast-dab`
 
 Usage
