@@ -106,8 +106,6 @@ class DabServer():
 
 
   async def get_audio(self, request, retry = True):
-    if not self.radio_controller.c_impl:
-      raise web.HTTPServiceUnavailable()
     channel = request.match_info['channel']
     program = request.match_info['program']  
     if program.startswith('cover.'):
