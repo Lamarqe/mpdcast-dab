@@ -44,21 +44,25 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self._dabserver_current_station = None
     self._media_event = asyncio.Event()
     self._media_status = None
+    self._cast_finder = None
   
   def waitfor_and_register_device(self):
-    cast_finder = CastFinder(self.device_name)
-    cast_finder.doDiscovery()
-    self.chromecast = pychromecast.get_chromecast_from_cast_info(cast_finder.device, zeroconf.Zeroconf())
+    self._cast_finder = CastFinder(self.device_name)
+    self._cast_finder.doDiscovery()
+    if self._cast_finder.device:
+      self.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast_finder.device, zeroconf.Zeroconf())
 
-    self.chromecast.wait()
-    if (self.chromecast.app_id != pychromecast.IDLE_APP_ID):
-      self.chromecast.quit_app()
-      time.sleep(0.5)
-    self.controller = LocalMediaPlayerController(self.cast_receiver_url, False)
-    self.chromecast.register_handler(self.controller)   # allows Chromecast to use Local Media Player app
-    self.chromecast.register_connection_listener(self)  # this will call new_connection_status() => re-init from scratch
-    self.controller.register_status_listener(self)      # this will call new_media_status() / load_media_failed()
-#    self.chromecast.register_status_listener(self)      # this will call new_cast_status()  => not of interest
+      self.chromecast.wait()
+      if (self.chromecast.app_id != pychromecast.IDLE_APP_ID):
+        self.chromecast.quit_app()
+        time.sleep(0.5)
+      self.controller = LocalMediaPlayerController(self.cast_receiver_url, False)
+      self.chromecast.register_handler(self.controller)   # allows Chromecast to use Local Media Player app
+      self.chromecast.register_connection_listener(self)  # this will call new_connection_status() => re-init from scratch
+      self.controller.register_status_listener(self)      # this will call new_media_status() / load_media_failed()
+      #self.chromecast.register_status_listener(self)      # this will call new_cast_status()  => not of interest
+
+    self._cast_finder = None
 
   def new_media_status(self, status):
     self._media_status = status
@@ -240,3 +244,5 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
   def stop(self):
     self.mpd_client.disconnect()
+    if self._cast_finder:
+      self._cast_finder.cancel()

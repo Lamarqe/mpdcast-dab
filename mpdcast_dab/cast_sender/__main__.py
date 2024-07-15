@@ -78,6 +78,7 @@ async def setup_webserver(runner, port):
   site = web.TCPSite(runner, '0.0.0.0', port)
   await site.start()
 
+
 def updateLoggerConfig(quiet):
   internal_log_level = logging.WARNING if quiet else logging.INFO
   external_log_level = logging.ERROR   if quiet else logging.WARNING
@@ -133,7 +134,7 @@ def main():
   try:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.create_task(setup_webserver(runner, WEB_PORT))
+    loop.run_until_complete(setup_webserver(runner, WEB_PORT))
 
     # run the webserver in parallel to the cast task
     while True:

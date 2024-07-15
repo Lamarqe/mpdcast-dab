@@ -23,3 +23,6 @@ class CastFinder(pychromecast.discovery.AbstractCastListener):
     self._browser.start_discovery()
     await self._my_task.wait()
     self._browser.stop_discovery()    
+
+  def cancel(self):
+    self._my_task.set()
