@@ -9,6 +9,7 @@ Table of contents
 ====
 
   * [Download](#download)
+  * [Configuration](#configuration)
   * [Usage](#usage)
   * [Supported Hardware](#supported-hardware)
   * [Building](#building)
@@ -21,6 +22,29 @@ Download
   * `apt update`
   * `apt install mpdcast-dab`
 
+Configuration
+=====
+MpdCast DAB reads mpd.conf and requires / reads the following properties in it:
+  * `audio_output` of type `"httpd"` must be enabled
+  * the `name` property must be set to your chromecast device name, eg: `"Nest Hub"`
+
+example config:
+
+```
+audio_output {
+        type            "httpd"
+        name            "Nest Hub"
+        encoder         "lame"          # optional, vorbis or lame
+        port            "8000"
+        bind_to_address "0.0.0.0"               # optional, IPv4 or IPv6
+        quality         "7.0"                   # do not define if bitrate is defined
+        bitrate         "192"                   # do not define if quality is defined
+        format          "48000:16:2"
+        max_clients     "0"                     # optional 0=no limit
+}
+```
+
+  
 Usage
 =====
 The command-line parameters are:
@@ -28,7 +52,7 @@ The command-line parameters are:
 Parameter | Description | Default Value
 ------ | ---------- | ---------- 
 --quiet | Print errors only | False (True when running as systemd service) 
---conf | Show version | /etc/mpd.conf
+--conf | Path to MPD config | /etc/mpd.conf
 
 Supported Hardware
 ====================
