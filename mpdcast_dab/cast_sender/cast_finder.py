@@ -21,8 +21,5 @@ class CastFinder(pychromecast.discovery.AbstractCastListener):
     self._browser = pychromecast.discovery.CastBrowser(self, zeroconf.Zeroconf(), None)
     self._my_task = asyncio.Event()
     self._browser.start_discovery()
-    await self._waitForDiscoveryEnd()
-    self._browser.stop_discovery()    
-
-  async def _waitForDiscoveryEnd(self):
     await self._my_task.wait()
+    self._browser.stop_discovery()    

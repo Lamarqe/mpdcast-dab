@@ -30,19 +30,13 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   cast_forever returns as soon as the connection to the mpdclient instance is lost
   """
 
-  def __init__(self, config, my_ip, image_server, cast_receiver_url):
-    self.image_server = image_server
+  def __init__(self, my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_server):
+    self.image_server      = image_server
     self.cast_receiver_url = cast_receiver_url
+    self.mpd_port          = mpd_port
+    self.device_name       = device_name
+    self.cast_url          = 'http://' + my_ip + ':' + streaming_port + '/'
     self.default_image = 'https://www.musicpd.org/logo.png'
-    self.my_ip = my_ip
-    self.mpd_port = int(config.get("port", "6600"))
-
-    for audio_output in config["audio_output"]:
-      if audio_output["type"] == "httpd":
-        streaming_port = int(audio_output["port"])
-        self.cast_url = "http://" + self.my_ip + ":" + str(streaming_port) + "/"
-        self.device_name = audio_output["name"]
-
     self.mpd_client = mpd.asyncio.MPDClient()
     self.controller  = None
     self.chromecast  = None
@@ -246,18 +240,3 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
   def stop(self):
     self.mpd_client.disconnect()
-
-def load_mpd_config(config_filename):
-  logger.info('Loading config from %s', config_filename)
-  cfg_file = open(config_filename, "r")
-  confStr = cfg_file.read()
-
-  # convert curly brace groups to toml arrays
-  confStr = re.sub(r"\n([^\s#]*?)\s*{(.*?)}", r"\n[[\1]]\2\n", confStr, flags=re.S, count=0)
-  # separate key and value with equals sign
-  confStr = re.sub(r"^\s*(\w+)\s*(.*)$", r"\1 = \2", confStr, flags=re.M, count=0)
-  # now the config should adhere to toml spec.
-  mpd_config = tomllib.loads(confStr)
-  cfg_file.close()
-
-  return mpd_config
