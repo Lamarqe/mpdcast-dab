@@ -145,7 +145,7 @@ def main():
       loop.run_until_complete(mpd_caster.cast_forever())
 
   except KeyboardInterrupt:
-    mpd_caster.stop()
+    loop.run_until_complete(mpd_caster.stop())
     loop.run_until_complete(dab_server.stop())
     loop.run_until_complete(runner.cleanup())
     stdout_grabber.cleanup()
