@@ -190,6 +190,9 @@ class RadioController():
   # returns handler in case the subscription suceeded, otherwise None
   async def subscribe_program(self, channel, program_name):
     async with self._subscription_lock:
+      # if the device is not initialized, block any actions
+      if not self.c_impl:
+        return None
       # Block actions in case there is another channel active
       if self._current_channel and self._current_channel != channel:
         return None
@@ -278,9 +281,11 @@ class RadioController():
     await asyncio.sleep(1)
   
   async def finalize(self):
-    active_pids = list(self._programme_handlers.keys())
-    for program_pid in active_pids:
-      await self._unsubscribe(program_pid)
-    c_lib.close_device(self.c_impl)
-    c_lib.finalize(self.c_impl)
-    
+    async with self._subscription_lock:
+      active_pids = list(self._programme_handlers.keys())
+      for program_pid in active_pids:
+        await self._unsubscribe(program_pid)
+      c_lib.close_device(self.c_impl)
+      c_lib.finalize(self.c_impl)
+      self.c_impl = None
+  
