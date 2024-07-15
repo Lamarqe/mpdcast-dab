@@ -243,8 +243,9 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       return
 
   async def stop(self):
-    self.mpd_client.stop()
-    self.mpd_client.disconnect()
-    self._handle_mpd_stop_play()
     if self._cast_finder:
       self._cast_finder.cancel()
+    else:
+      self.mpd_client.stop()
+      self.mpd_client.disconnect()
+      self._handle_mpd_stop_play()
