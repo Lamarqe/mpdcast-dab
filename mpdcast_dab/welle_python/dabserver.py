@@ -114,6 +114,8 @@ class DabServer():
     
     # Check if the device is busy with streaming another channel
     if retry and self.radio_controller.get_current_channel() and self.radio_controller.get_current_channel() != channel:
+      # This might be a program switch with the new subscription request coming faster then the unsubscribe. 
+			# So lets check by waiting for half a second and then retry. In case of a switch, the unsubscribe will be processed then 
       await asyncio.sleep(0.5)
       await self.get_audio(request, False)
 
