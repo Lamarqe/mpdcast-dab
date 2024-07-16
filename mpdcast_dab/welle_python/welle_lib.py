@@ -192,9 +192,11 @@ class RadioController():
     async with self._subscription_lock:
       # if the device is not initialized, block any actions
       if not self.c_impl:
+        logger.error('device is not initialized')
         return None
       # Block actions in case there is another channel active
       if self._current_channel and self._current_channel != channel:
+        logger.error('there is another channel active')
         return None
 
       # If There is no active channel, tune the device to the channel
@@ -224,6 +226,7 @@ class RadioController():
       if not program_pid:
         if not self._programme_handlers:
           await self._reset()
+        logger.error('The program %s is not part of the channel %s', program_name, channel)
         return None
        
       # the program exists in the channel. Check if there is already an active subscription
@@ -236,6 +239,7 @@ class RadioController():
         if not c_lib.subscribe_program(self.c_impl, programme_handler, program_pid):
           if not self._programme_handlers:
             await self._reset()
+          logger.error('Subscription to selected program failed')
           return None
 
       # increase the counter of active subscriptions for the selected program
@@ -289,3 +293,5 @@ class RadioController():
       c_lib.finalize(self.c_impl)
       self.c_impl = None
   
+  def get_current_channel(self):
+    return self._current_channel

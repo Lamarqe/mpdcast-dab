@@ -112,15 +112,14 @@ class DabServer():
       raise web.HTTPNotFound()
     logger.info('new audio request for %s', program)
     
+    # Check if the device is busy with streaming another channel
+    if retry and self.radio_controller.get_current_channel() and self.radio_controller.get_current_channel() != channel:
+      await asyncio.sleep(0.5)
+      await self.get_audio(request, False)
 
     handler = await self.radio_controller.subscribe_program(channel, program)
     if not handler:
-      # The device is busy with streaming another channel
-      if retry:
-        await asyncio.sleep(0.5)
-        await self.get_audio(request, False)
-      else:
-        raise web.HTTPServiceUnavailable()
+      raise web.HTTPServiceUnavailable()
     
     # from here on, the device sends us the audio stream
     # send it via stream response until the user cancels it
