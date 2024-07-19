@@ -66,7 +66,7 @@ class RadioController(RadioControllerInterface):
   async def subscribe_program(self, channel, program_name):
     async with self._subscription_lock:
       # if the device is not initialized, block any actions
-      if not self.self._dab_device.initialized():
+      if not self._dab_device.initialized():
         logger.error('device is not initialized')
         return None
       # Block actions in case there is another channel active

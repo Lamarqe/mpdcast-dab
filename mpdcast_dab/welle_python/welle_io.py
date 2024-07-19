@@ -60,7 +60,7 @@ class DabDevice():
   def __init__(self):
     self._capsule = None
 
-  def initialized() -> bool:
+  def initialized(self) -> bool:
     return self._capsule is not None
 
   def init_device(self, controller: RadioControllerInterface, device_name: str, gain: int = -1) -> bool:
