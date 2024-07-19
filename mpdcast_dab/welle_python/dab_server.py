@@ -3,7 +3,8 @@ from aiohttp import web
 import logging
 logger = logging.getLogger(__name__)
 
-import mpdcast_dab.welle_python.welle_lib as welle_lib
+from mpdcast_dab.welle_python.radio_controller import RadioController
+from mpdcast_dab.welle_python.wav_programme_handler import UnsubscribedError
 
 
 class DabServer():
@@ -11,7 +12,7 @@ class DabServer():
   def __init__(self, my_ip, port):
     self.my_ip = my_ip
     self.port = port
-    self.radio_controller = welle_lib.RadioController()
+    self.radio_controller = RadioController()
     self.handlers = {}
 
   def init_dab_device(self):
@@ -60,7 +61,7 @@ class DabServer():
         return web.Response(body = image['data'],
                             content_type = image['type'],
                             headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
-      except welle_lib.UnsubscribedError:
+      except UnsubscribedError:
         raise web.HTTPBadRequest()
     else:
       raise web.HTTPNotFound()
@@ -75,7 +76,7 @@ class DabServer():
         label = await self.handlers[program].new_label()
         return web.Response(text=label,
                             headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
-      except welle_lib.UnsubscribedError:
+      except UnsubscribedError:
         raise web.HTTPBadRequest()
     else:
       raise web.HTTPNotFound()
@@ -150,7 +151,7 @@ class DabServer():
       if not self.radio_controller.is_playing(program):
         del self.handlers[program]
       return response
-    except welle_lib.UnsubscribedError:
+    except UnsubscribedError:
       return response
 
     # Make sure above that this line remains unreachable 

@@ -3,117 +3,14 @@ import datetime
 import logging
 logger = logging.getLogger(__name__)
 
-import mpdcast_dab.welle_python.libwelle_py as c_lib
+from mpdcast_dab.welle_python.wav_programme_handler import WavProgrammeHandler, UnsubscribedError
+from mpdcast_dab.welle_python.welle_io import RadioControllerInterface, DabDevice
 
-class UnsubscribedError(Exception):
-  pass
-
-class WavProgrammeHandler():
-  BUFFER_SIZE = 10
-
-  def __init__(self, controller, sId):
-    self._controller = controller
-    self.sId = sId
-    self._subscribers = 0
-
-    self._next_frame = 0
-    self._audio_data = [b''] * WavProgrammeHandler.BUFFER_SIZE
-    self._audio_data_lock = asyncio.Lock()
-
-    # properties for most recent data. 
-    # Can be used directly by user applications to get the most recent data
-    self.picture = None
-    self.label   = ''
-    
-    # internal update notification events
-    self._audio_event      = asyncio.Event()
-    self._picture_event    = asyncio.Event()
-    self._label_event      = asyncio.Event()
-    
-    self._caller_loop = asyncio.get_running_loop()
-    self._delete_in_progress = False
-
-  # notification routines for user applications
-  async def new_audio(self, start_frame=0):
-    if start_frame == self._next_frame:
-      await self._audio_event.wait()
-      if self._delete_in_progress:
-        raise UnsubscribedError
-    async with self._audio_data_lock:
-      if start_frame < self._next_frame:
-        ret_list = self._audio_data[start_frame:self._next_frame]
-      else:
-        ret_list = self._audio_data[start_frame:] + self._audio_data[:self._next_frame]
-      audio_out = b''.join(ret_list)
-      return self._next_frame, audio_out
-
-  async def new_picture(self):
-    logger.debug('waiting for new picture')
-    await self._picture_event.wait()
-    if self._delete_in_progress:
-      raise UnsubscribedError
-    else:
-      logger.debug('forwarding new picture of type %s', self.picture['type'])
-      return self.picture
-
-  async def new_label(self):
-    logger.debug('waiting for new label')
-    await self._label_event.wait()
-    if self._delete_in_progress:
-      raise UnsubscribedError
-    else:
-      logger.debug('forwarding new label')
-      return self.label
-
-  def _release_waiters(self):
-    self._delete_in_progress = True
-    self._audio_event.set()
-    self._picture_event.set()
-    self._label_event.set()
-
-  def onFrameErrors(self, frameErrors):
-    pass
-
-  def onNewAudio(self, audio_data, sample_rate, mode):
-    self.sample_rate = sample_rate
-    asyncio.run_coroutine_threadsafe(self.buffer_audio(audio_data), self._caller_loop)
-
-  async def buffer_audio(self, audio_data):
-    async with self._audio_data_lock:
-      self._audio_data[self._next_frame] = audio_data
-      self._next_frame = (self._next_frame+1) % WavProgrammeHandler.BUFFER_SIZE
-    if not self._delete_in_progress:
-      self._audio_event.set()
-      self._audio_event.clear()
-
-  def onRsErrors(self, uncorrectedErrors, numCorrectedErrors):
-    pass
-
-  def onAacErrors(self, aacErrors):
-    pass
-
-  def onNewDynamicLabel(self, label):
-    self.label = label
-    asyncio.run_coroutine_threadsafe(self._set_event(self._label_event), self._caller_loop)
-    
-  async def _set_event(self, event):
-    if not self._delete_in_progress:
-      event.set()
-      event.clear()
-
-  def onMOT(self, data, mime_type, name):
-    self.picture = {'type': mime_type, 'data': data, 'name': name}
-    asyncio.run_coroutine_threadsafe(self._set_event(self._picture_event), self._caller_loop)
-
-  def onPADLengthError(self, announced_xpad_len, xpad_len):
-    pass
-
-
-class RadioController():
+class RadioController(RadioControllerInterface):
   PROGRAM_DISCOVERY_TIMEOUT = 10
   
-  def __init__(self, gain=-1):
-    self.gain = gain    
+  def __init__(self):
+    self._dab_device = DabDevice()
     self.programs            = {}
     self._programme_handlers = {}
 
@@ -125,28 +22,12 @@ class RadioController():
 
     
   # Note: This method must not be called by __init__, as self cannot yet be used at this point
-  def init_device(self, device_name = "auto"):
-    self.c_impl = c_lib.init_device(self, device_name, self.gain)
-
-  def onSNR(self, snr):
-    pass
-    
-  def onFrequencyCorrectorChange(self, fine, coarse):
-    pass
-    
-  def onSyncChange(self, isSync):
-    if isSync[0]:
-      pass
-    
-  def onSignalPresence(self, isSignal):
-    pass
+  def init_device(self, device_name = 'auto'):
+    self._dab_device.init_device(self, device_name)
     
   def onServiceDetected(self, sId):
     if not sId in self.programs:
       self.programs[sId] = None
-    
-  def onNewEnsemble(self, eId):
-    pass
     
   def onSetEnsembleLabel(self, label):
     self.ensemble_label = label
@@ -154,16 +35,10 @@ class RadioController():
   def onDateTimeUpdate(self, timestamp):
     self.datetime = datetime.datetime.fromtimestamp(timestamp)
 
-  def onFIBDecodeSuccess(self, crcCheckOk, fib):
-    pass
-    
-  def onMessage(self, text, text2, isError):
-    pass
-    
   def _get_program_id(self, program_name):
     for sId in self.programs:
       if not self.programs[sId] or len(self.programs[sId]) == 0:
-        self.programs[sId] = c_lib.get_service_name(self.c_impl, sId).rstrip()
+        self.programs[sId] = self._dab_device.get_service_name(sId).rstrip()
       if self.programs[sId] == program_name:
         return sId
     # Not found
@@ -191,7 +66,7 @@ class RadioController():
   async def subscribe_program(self, channel, program_name):
     async with self._subscription_lock:
       # if the device is not initialized, block any actions
-      if not self.c_impl:
+      if not self.self._dab_device.initialized():
         logger.error('device is not initialized')
         return None
       # Block actions in case there is another channel active
@@ -201,7 +76,7 @@ class RadioController():
 
       # If There is no active channel, tune the device to the channel
       if not self._current_channel:
-        tune_okay = c_lib.set_channel(self.c_impl, channel)
+        tune_okay = self._dab_device.set_channel(channel)
         if tune_okay:
           self._current_channel = channel
         else:
@@ -236,7 +111,7 @@ class RadioController():
         # First time subscription to the channel. Set up the handler and register it.
         programme_handler = WavProgrammeHandler(self, program_pid)
         self._programme_handlers[program_pid] = programme_handler
-        if not c_lib.subscribe_program(self.c_impl, programme_handler, program_pid):
+        if not self._dab_device.subscribe_program(programme_handler, program_pid):
           if not self._programme_handlers:
             await self._reset()
           logger.error('Subscription to selected program failed')
@@ -271,7 +146,7 @@ class RadioController():
     programme_handler._subscribers -= 1
     logger.debug('subscribers: %d', programme_handler._subscribers)
     if programme_handler._subscribers == 0:
-      c_lib.unsubscribe_program(self.c_impl, program_pid)
+      self._dab_device.unsubscribe_program(program_pid)
       self._programme_handlers[program_pid]._release_waiters()
       del self._programme_handlers[program_pid]
       await asyncio.sleep(1)
@@ -279,7 +154,7 @@ class RadioController():
         await self._reset()
 
   async def _reset(self):
-    c_lib.set_channel(self.c_impl, "")
+    self._dab_device.set_channel("")
     self._current_channel = None
     self.programs.clear()
     await asyncio.sleep(1)
@@ -289,9 +164,8 @@ class RadioController():
       active_pids = list(self._programme_handlers.keys())
       for program_pid in active_pids:
         await self._unsubscribe(program_pid)
-      c_lib.close_device(self.c_impl)
-      c_lib.finalize(self.c_impl)
-      self.c_impl = None
+      self._dab_device.close_device()
+      self._dab_device.finalize()
   
   def get_current_channel(self):
     return self._current_channel

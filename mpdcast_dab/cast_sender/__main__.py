@@ -10,6 +10,7 @@ import socket
 import ifaddr
 import time
 import logging
+from aiohttp import web
 
 import threading
 import traceback
@@ -21,7 +22,7 @@ from mpdcast_dab.cast_sender.output_grabber import *
 import mpdcast_dab.cast_sender.imageserver as imageserver
 from mpdcast_dab.cast_sender.mpd_caster import *
 
-from mpdcast_dab.welle_python.dabserver import *
+from mpdcast_dab.welle_python.dab_server import DabServer
 
 def get_first_ipv4_address():
   for iface in ifaddr.get_adapters():

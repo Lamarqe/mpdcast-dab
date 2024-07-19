@@ -183,7 +183,7 @@ class PythonRadioController : public RadioControllerInterface {
       });
     }
 
-    virtual bool set_channel(std::string channel)
+    virtual bool set_channel(std::string channel, bool isScan)
     {
       if (channel.empty())
       {
@@ -212,7 +212,7 @@ class PythonRadioController : public RadioControllerInterface {
           rro.decodeTII = true;
           rx = new RadioReceiver(*this, *device, rro);
 
-          rx->restart(false);
+          rx->restart(isScan);
           return true;
         }
       }
@@ -304,15 +304,15 @@ class PythonRadioController : public RadioControllerInterface {
     }
     virtual void onSignalPresence(bool isSignal) override
     { 
-//      pool.enqueue([isSignal, this]
-//      {
-//        PyGILState_STATE gstate  = PyGILState_Ensure ();
-//        PyObject *result = PyObject_CallMethod (python_impl, "onSignalPresence", "(p)", isSignal);
-//
-//        if (result)
-//           Py_DECREF (result);
-//        PyGILState_Release (gstate);
-//      });
+      pool.enqueue([isSignal, this]
+      {
+        PyGILState_STATE gstate  = PyGILState_Ensure ();
+        PyObject *result = PyObject_CallMethod (python_impl, "onSignalPresence", "(O)", PyBool_FromLong(isSignal));
+
+        if (result)
+           Py_DECREF (result);
+        PyGILState_Release (gstate);
+      });
     }
 
     virtual void onServiceDetected(uint32_t sId) override
@@ -441,12 +441,14 @@ PyObject *set_channel (PyObject */*self*/, PyObject *args)
 {
   PyObject  *handle_capsule;
   char  *chan;
+  PyObject  *is_scan_pyobj;
 
-  PyArg_ParseTuple (args, "Os", &handle_capsule, &chan);
+  PyArg_ParseTuple (args, "OsO", &handle_capsule, &chan, &is_scan_pyobj);
   PythonRadioController* ri = reinterpret_cast<PythonRadioController*>(PyCapsule_GetPointer (handle_capsule, "library_object"));
+  bool isScan = PyObject_IsTrue(is_scan_pyobj);
   
   std::string channel(chan);
-  bool chan_ok = ri->set_channel(channel);
+  bool chan_ok = ri->set_channel(channel, isScan);
   return chan_ok ? Py_NewRef(Py_True) : Py_NewRef(Py_False);
 }
 
@@ -505,14 +507,27 @@ PyObject *finalize (PyObject */*self*/, PyObject *args) {
   Py_RETURN_NONE;
 }
 
+PyObject *all_channel_names (PyObject */*self*/, PyObject *args)
+{
+  Channels chans;
+  PyObject* result = PyList_New(0);
+  PyList_Append(result, PyUnicode_FromString(chans.getCurrentChannel().c_str()));
+  for (int i = 1; i < NUMBEROFCHANNELS; ++i)
+	{
+    PyList_Append(result, PyUnicode_FromString(chans.getNextChannel().c_str()));
+  }		
+	return result; 
+}
+
 static PyMethodDef module_methods [] = {
-  {"init_device",          init_device,         METH_VARARGS, ""},
+  {"init_device",         init_device,         METH_VARARGS, ""},
   {"set_channel",         set_channel,         METH_VARARGS, ""},
   {"subscribe_program",   subscribe_program,   METH_VARARGS, ""},
-  {"unsubscribe_program",  unsubscribe_program, METH_VARARGS, ""},
+  {"unsubscribe_program", unsubscribe_program, METH_VARARGS, ""},
   {"close_device",        close_device,        METH_VARARGS, ""},
   {"finalize",            finalize,            METH_VARARGS, ""},
   {"get_service_name",    get_service_name,    METH_VARARGS, ""},
+  {"all_channel_names",   all_channel_names,   METH_VARARGS, ""},
   {NULL, NULL, 0, NULL}
 };
 
