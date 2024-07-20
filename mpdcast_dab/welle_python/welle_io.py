@@ -1,8 +1,14 @@
 from abc import ABC, abstractmethod
 
 import mpdcast_dab.welle_python.libwelle_py as welle_io
+import asyncio
+import atexit
+import time
+import logging
+logger = logging.getLogger(__name__)
 
-class ProgrammeHandlerInterface(ABC):
+
+class ProgrammeHandlerInterface():
 
   def onFrameErrors(self, frameErrors: int) -> None:
     pass
@@ -23,49 +29,71 @@ class ProgrammeHandlerInterface(ABC):
     pass
 
 
-class RadioControllerInterface(ABC):
+class RadioControllerInterface():
 
-  def onSNR(self, snr: float) -> None:
+  async def onSNR(self, snr: float) -> None:
     pass
     
-  def onFrequencyCorrectorChange(self, fine: int, coarse: int) -> None:
+  async def onFrequencyCorrectorChange(self, fine: int, coarse: int) -> None:
     pass
     
-  def onSyncChange(self, isSync: int) -> None:
+  async def onSyncChange(self, isSync: int) -> None:
     pass
     
-  def onSignalPresence(self, isSignal: int) -> None:
-    pass
-    
-  def onServiceDetected(self, sId: int) -> None:
-    pass
-    
-  def onNewEnsemble(self, eId: int) -> None:
-    pass
-    
-  def onSetEnsembleLabel(self, label: str) -> None:
+  async def onSignalPresence(self, isSignal: int) -> None:
     pass
 
-  def onDateTimeUpdate(self, timestamp: int) -> None:
-    pass
-
-  def onFIBDecodeSuccess(self, crcCheckOk: int, fib: int) -> None:
+  async def onServiceDetected(self, sId: int) -> None:
     pass
     
-  def onMessage(self, text: str, text2: str, isError: int) -> None:
+  async def onNewEnsemble(self, eId: int) -> None:
+    pass
+    
+  async def onSetEnsembleLabel(self, label: str) -> None:
     pass
 
+  async def onDateTimeUpdate(self, timestamp: int) -> None:
+    pass
+
+  async def onFIBDecodeSuccess(self, crcCheckOk: int, fib: int) -> None:
+    pass
+    
+  async def onMessage(self, text: str, text2: str, isError: int) -> None:
+    pass
+
+
+class Forwarder():
+  def __getattr__(self, attr):
+    method = getattr(self.forward_object, attr)
+    def asyncio_callback(*args, **kwargs):
+      asyncio.run_coroutine_threadsafe(method(*args, **kwargs), self._loop)
+    return asyncio_callback
 
 class DabDevice():
-  def __init__(self):
-    self._capsule = None
+  def __init__(self, device_name: str = 'auto', gain: int = -1):
+    self._controller_stub = RadioControllerInterface()
+    self._forwarder = Forwarder()
+    self._forwarder.forward_object = self._controller_stub
+    self._forwarder._loop = asyncio.get_event_loop() # = loop
+    self._capsule = welle_io.init_device(self._forwarder, device_name, gain)
+    if self._capsule:
+      atexit.register(self.cleanup)
 
-  def initialized(self) -> bool:
-    return self._capsule is not None
+  def aquire_now(self, radio_controller: RadioControllerInterface) -> bool:
+    if self._forwarder.forward_object == self._controller_stub:
+      self._forwarder.forward_object = radio_controller
+      return True
+    else:
+      return False
 
-  def init_device(self, controller: RadioControllerInterface, device_name: str, gain: int = -1) -> bool:
-    if not self._capsule:
-      self._capsule = welle_io.init_device(controller, device_name, gain)
+  def release(self) -> bool:
+    if self._forwarder.forward_object != self._controller_stub:
+      self._forwarder.forward_object = self._controller_stub
+      return True
+    else:
+      return False
+
+  def is_usable(self) -> bool:
     return self._capsule is not None
 
   def set_channel(self, channel: str, is_scan: bool = False) -> bool:
@@ -86,20 +114,14 @@ class DabDevice():
     else:
       return welle_io.unsubscribe_program(self._capsule, service_id)
 
-  def close_device(self) -> bool:
-    if not self._capsule:
-      return False
-    else:
+  def cleanup(self) -> None:
+    if self._capsule:
+      welle_io.set_channel(self._capsule, '', False)
       welle_io.close_device(self._capsule)
-      return True
-
-  def finalize(self) -> bool:
-    if not self._capsule:
-      return False
-    else:
+      # wait for all c-lib callbacks to be processed in python. Otherwise we might deadlock
+      time.sleep(0.1)
       welle_io.finalize(self._capsule)
       self._capsule = None
-      return True
 
   def get_service_name(self, service_id: int) -> str:
     if not self._capsule:

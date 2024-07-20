@@ -5,6 +5,7 @@ logger = logging.getLogger(__name__)
 
 from mpdcast_dab.welle_python.radio_controller import RadioController
 from mpdcast_dab.welle_python.wav_programme_handler import UnsubscribedError
+from mpdcast_dab.welle_python.welle_io import DabDevice
 
 
 class DabServer():
@@ -12,11 +13,14 @@ class DabServer():
   def __init__(self, my_ip, port):
     self.my_ip = my_ip
     self.port = port
-    self.radio_controller = RadioController()
+    device = DabDevice('auto')
+    if device.is_usable():
+      self.radio_controller = RadioController(device)
+
     self.handlers = {}
 
-  def init_dab_device(self):
-    self.radio_controller.init_device()
+#  async def init_dab_device(self):
+#    await self.radio_controller.init_device()
 
   def get_routes(self):
     return [web.get(r'/stream/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_audio),
@@ -26,7 +30,7 @@ class DabServer():
             web.get(r'/label/next/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_next_label)]
 
   async def stop(self):
-    await self.radio_controller.finalize()
+    await self.radio_controller.unsubscribe_all_programs()
 
 
   # is_float should only be true if the audio data is in 32-bit floating-point format.

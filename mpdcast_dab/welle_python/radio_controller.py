@@ -9,21 +9,16 @@ from mpdcast_dab.welle_python.welle_io import RadioControllerInterface, DabDevic
 class RadioController(RadioControllerInterface):
   PROGRAM_DISCOVERY_TIMEOUT = 10
   
-  def __init__(self):
-    self._dab_device = DabDevice()
+  def __init__(self, device: DabDevice):
+    self._dab_device = device
     self.programs            = {}
     self._programme_handlers = {}
 
-    self._current_channel = ""
+    self._current_channel = ''
     self.ensemble_label   = None
 
     # lock to prevent parallel initialization from multiple users
     self._subscription_lock = asyncio.Lock()
-
-    
-  # Note: This method must not be called by __init__, as self cannot yet be used at this point
-  def init_device(self, device_name = 'auto'):
-    self._dab_device.init_device(self, device_name)
     
   def onServiceDetected(self, sId):
     if not sId in self.programs:
@@ -65,10 +60,6 @@ class RadioController(RadioControllerInterface):
   # returns handler in case the subscription suceeded, otherwise None
   async def subscribe_program(self, channel, program_name):
     async with self._subscription_lock:
-      # if the device is not initialized, block any actions
-      if not self._dab_device.initialized():
-        logger.error('device is not initialized')
-        return None
       # Block actions in case there is another channel active
       if self._current_channel and self._current_channel != channel:
         logger.error('there is another channel active')
@@ -76,11 +67,16 @@ class RadioController(RadioControllerInterface):
 
       # If There is no active channel, tune the device to the channel
       if not self._current_channel:
+        if not self._dab_device.aquire_now(self):
+          logger.error('DAB device is locked. No playback possible.')
+          return None
+
         tune_okay = self._dab_device.set_channel(channel)
         if tune_okay:
           self._current_channel = channel
         else:
           print("could not start device, fatal")
+          self._dab_device.release()
           return None
 
       # Wait for the selected program to appear in the channel
@@ -94,7 +90,7 @@ class RadioController(RadioControllerInterface):
             ConnectionResetError):
         if not self._programme_handlers:
           await self._reset()
-				# re-throw the exception so the caller can also do its cleanup
+        # re-throw the exception so the caller can also do its cleanup
         raise
 
       # The program is not part of the channel
@@ -158,14 +154,13 @@ class RadioController(RadioControllerInterface):
     self._current_channel = None
     self.programs.clear()
     await asyncio.sleep(1)
+    self._dab_device.release()
   
-  async def finalize(self):
+  async def unsubscribe_all_programs(self):
     async with self._subscription_lock:
       active_pids = list(self._programme_handlers.keys())
       for program_pid in active_pids:
         await self._unsubscribe(program_pid)
-      self._dab_device.close_device()
-      self._dab_device.finalize()
   
   def get_current_channel(self):
     return self._current_channel

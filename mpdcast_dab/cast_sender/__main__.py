@@ -122,7 +122,6 @@ def main():
   updateLoggerConfig(args['quiet'])
   
   dab_server = DabServer(my_ip, WEB_PORT)
-  dab_server.init_dab_device()
 
   web_app = web.Application()
   web_app.add_routes([web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
@@ -133,8 +132,10 @@ def main():
   cast_receiver_url = 'http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE
   
   try:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+#    loop = asyncio.new_event_loop()
+#    asyncio.set_event_loop(loop)
+    loop = asyncio.get_event_loop()
+#    loop.run_until_complete(dab_server.init_dab_device())
     loop.run_until_complete(setup_webserver(runner, WEB_PORT))
 
     # run the webserver in parallel to the cast task
