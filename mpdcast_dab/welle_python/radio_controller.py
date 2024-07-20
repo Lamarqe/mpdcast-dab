@@ -20,14 +20,14 @@ class RadioController(RadioControllerInterface):
     # lock to prevent parallel initialization from multiple users
     self._subscription_lock = asyncio.Lock()
     
-  def onServiceDetected(self, sId):
+  async def onServiceDetected(self, sId):
     if not sId in self.programs:
       self.programs[sId] = None
     
-  def onSetEnsembleLabel(self, label):
+  async def onSetEnsembleLabel(self, label):
     self.ensemble_label = label
 
-  def onDateTimeUpdate(self, timestamp):
+  async def onDateTimeUpdate(self, timestamp):
     self.datetime = datetime.datetime.fromtimestamp(timestamp)
 
   def _get_program_id(self, program_name):

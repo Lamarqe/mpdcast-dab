@@ -19,9 +19,6 @@ class DabServer():
 
     self.handlers = {}
 
-#  async def init_dab_device(self):
-#    await self.radio_controller.init_device()
-
   def get_routes(self):
     return [web.get(r'/stream/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_audio),
             web.get(r'/image/current/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_current_image),

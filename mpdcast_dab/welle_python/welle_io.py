@@ -10,22 +10,22 @@ logger = logging.getLogger(__name__)
 
 class ProgrammeHandlerInterface():
 
-  def onFrameErrors(self, frameErrors: int) -> None:
+  async def onFrameErrors(self, frameErrors: int) -> None:
     pass
 
-  def onNewAudio(self, audio_data: bytes, sample_rate: int, mode: str) -> None:
+  async def onNewAudio(self, audio_data: bytes, sample_rate: int, mode: str) -> None:
     pass
 
-  def onRsErrors(self, uncorrectedErrors: int, numCorrectedErrors: int) -> None:
+  async def onRsErrors(self, uncorrectedErrors: int, numCorrectedErrors: int) -> None:
     pass
 
-  def onAacErrors(self, aacErrors: int) -> None:
+  async def onAacErrors(self, aacErrors: int) -> None:
     pass
 
-  def onNewDynamicLabel(self, label: str) -> None:
+  async def onNewDynamicLabel(self, label: str) -> None:
     pass
     
-  def onMOT(self, data: bytes, mime_type: str, name: str) -> None:
+  async def onMOT(self, data: bytes, mime_type: str, name: str) -> None:
     pass
 
 
@@ -62,7 +62,12 @@ class RadioControllerInterface():
     pass
 
 
-class Forwarder():
+class CallbackForwarder():
+  # This class forwards all c-lib callbacks to the actual RadioControllerInterface
+  # Making this indirect has two reasons:
+	# 1: It allows dynamic controller objects in python without having to re-initialize the device in C
+  # 2: The indirection includes a thread handover into async which is required anyways
+
   def __getattr__(self, attr):
     method = getattr(self.forward_object, attr)
     def asyncio_callback(*args, **kwargs):
@@ -72,9 +77,9 @@ class Forwarder():
 class DabDevice():
   def __init__(self, device_name: str = 'auto', gain: int = -1):
     self._controller_stub = RadioControllerInterface()
-    self._forwarder = Forwarder()
+    self._forwarder = CallbackForwarder()
+    self._forwarder._loop = asyncio.get_event_loop()
     self._forwarder.forward_object = self._controller_stub
-    self._forwarder._loop = asyncio.get_event_loop() # = loop
     self._capsule = welle_io.init_device(self._forwarder, device_name, gain)
     if self._capsule:
       atexit.register(self.cleanup)
@@ -106,7 +111,10 @@ class DabDevice():
     if not self._capsule:
       return False
     else:
-      return welle_io.subscribe_program(self._capsule, handler, service_id)
+      program_forwarder = CallbackForwarder()
+      program_forwarder.forward_object = handler
+      program_forwarder._loop = asyncio.get_event_loop()
+      return welle_io.subscribe_program(self._capsule, program_forwarder, service_id)
 
   def unsubscribe_program(self, service_id: int) -> bool:
     if not self._capsule:

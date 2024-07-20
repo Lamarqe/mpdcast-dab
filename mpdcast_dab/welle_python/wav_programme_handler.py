@@ -72,9 +72,9 @@ class WavProgrammeHandler(ProgrammeHandlerInterface):
     self._picture_event.set()
     self._label_event.set()
 
-  def onNewAudio(self, audio_data, sample_rate, mode):
+  async def onNewAudio(self, audio_data, sample_rate, mode):
     self.sample_rate = sample_rate
-    asyncio.run_coroutine_threadsafe(self.buffer_audio(audio_data), self._caller_loop)
+    await self.buffer_audio(audio_data)
 
   async def buffer_audio(self, audio_data):
     async with self._audio_data_lock:
@@ -84,15 +84,15 @@ class WavProgrammeHandler(ProgrammeHandlerInterface):
       self._audio_event.set()
       self._audio_event.clear()
 
-  def onNewDynamicLabel(self, label):
+  async def onNewDynamicLabel(self, label):
     self.label = label
-    asyncio.run_coroutine_threadsafe(self._set_event(self._label_event), self._caller_loop)
+    await self._set_event(self._label_event)
     
   async def _set_event(self, event):
     if not self._delete_in_progress:
       event.set()
       event.clear()
 
-  def onMOT(self, data, mime_type, name):
+  async def onMOT(self, data, mime_type, name):
     self.picture = {'type': mime_type, 'data': data, 'name': name}
-    asyncio.run_coroutine_threadsafe(self._set_event(self._picture_event), self._caller_loop)
+    await self._set_event(self._picture_event)
