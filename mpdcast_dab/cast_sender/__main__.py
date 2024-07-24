@@ -89,6 +89,9 @@ def updateLoggerConfig(quiet):
   logging.getLogger("zeroconf").setLevel(external_log_level)
   logging.getLogger("Welle.io").setLevel(external_log_level)
 
+async def get_webui(request):
+  return web.FileResponse(os.path.dirname(__file__)  + '/usr/share/mpdcast-dab/webui/index.htm')
+
 def main():
   CAST_PATH = '/cast_receiver'
   CAST_PAGE = 'receiver.html'
@@ -124,7 +127,7 @@ def main():
   dab_server = DabServer(my_ip, WEB_PORT)
 
   web_app = web.Application()
-  web_app.add_routes([web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
+  web_app.add_routes([web.get(r'', get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
   web_app.add_routes(image_request_handler.get_routes())
   web_app.add_routes(dab_server.get_routes())
   runner = web.AppRunner(web_app)

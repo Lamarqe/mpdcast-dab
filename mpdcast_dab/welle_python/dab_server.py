@@ -1,9 +1,11 @@
 import asyncio
+import json
 from aiohttp import web
 import logging
 logger = logging.getLogger(__name__)
 
 from mpdcast_dab.welle_python.radio_controller import RadioController
+from mpdcast_dab.welle_python.dab_scanner import DabScanner
 from mpdcast_dab.welle_python.wav_programme_handler import UnsubscribedError
 from mpdcast_dab.welle_python.welle_io import DabDevice
 
@@ -16,15 +18,31 @@ class DabServer():
     device = DabDevice('auto')
     if device.is_usable():
       self.radio_controller = RadioController(device)
+      self.scanner = DabScanner(device)
 
     self.handlers = {}
 
   def get_routes(self):
-    return [web.get(r'/stream/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_audio),
+    return [web.get('/DAB.m3u8', self.get_scanner_playlist),
+            web.get('/get_scanner_details', self.get_scanner_details),
+            web.post('/start_scan', self.start_scan),
+            web.get(r'/stream/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_audio),
             web.get(r'/image/current/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_current_image),
             web.get(r'/label/current/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_current_label),
             web.get(r'/image/next/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_next_image),
             web.get(r'/label/next/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_next_label)]
+
+  async def get_scanner_playlist(self, request):
+    resp = self.scanner.get_playlist(self.my_ip, self.port)
+    return web.Response(body = resp, content_type = 'audio/x-mpegurl')
+
+  async def start_scan(self, request):
+    resp = await self.scanner.start_scan()
+    return web.Response(body = json.dumps(resp), content_type = 'application/json')
+
+  async def get_scanner_details(self, request):
+    resp = self.scanner.status()
+    return web.Response(body = json.dumps(resp), content_type = 'application/json')
 
   async def stop(self):
     await self.radio_controller.unsubscribe_all_programs()

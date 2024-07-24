@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MpdCast DAB</title>
+<style>
+html * {
+  box-sizing: border-box;
+  color: black;
+  font-size: 16px;
+  font-family: sans-serif;
+}
+
+.row {
+  display: flex;
+}
+
+.column {
+  flex: 0 10em;
+  padding: 10px;
+}
+.column:nth-of-type(3) {
+  flex: 1;
+  padding: 10px;
+}
+.rowfull {
+  display: flex;
+  padding: 10px;
+}
+
+#progressBarHolder {
+  width: 600px;
+  margin-top: 20px;
+}
+
+#progressBar {
+  background-image: linear-gradient(#0099cc, #0099cc);
+  /* background must not get repeated for this to work */
+  background-repeat: no-repeat;
+  /* sets the width of the background to 0% but the height to 100% */
+  background-size: 0% 100%;
+  border: 1px solid #0066cc;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+#progressInformation {
+  color: black;
+  padding: 5px;
+  font-size: 16px;
+  text-align: center;
+  font-family: sans-serif;
+}
+
+button {
+  border: 1px solid #0066cc;
+  background-color: #0099cc;
+  color: #000000;
+  padding: 5px 10px;
+}
+button:disabled,
+button[disabled]{
+  border: 1px solid #999999;
+  background-color: #cccccc;
+  color: #666666;
+}
+
+</style>
+<body>
+
+<div class="row">
+  <div class="column">
+    <button type="button" onclick="start_scan();">Start scan</button> 
+  </div>
+  <div class="column">
+		<form method="get" action="DAB.m3u8">
+			 <button type="submit" id="download_button" disabled="true">Download playlist</button>
+		</form>
+  </div>
+  <div class="column" id=scanner_status>
+  </div>
+</div>
+<div id="progressBarHolder">
+	<div id="progressBar">
+		<div id="progressInformation">0 %</div>
+	</div>
+</div>
+
+
+<script>
+function start_scan () {
+  var xhr = new XMLHttpRequest();
+	xhr.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+      updateScannerDetails();
+		}
+	};
+  document.getElementById("scanner_status").innerHTML = "Starting scan..."
+	xhr.open("POST", "start_scan", true);
+	xhr.send();
+}
+
+
+function updateScannerDetails() {
+  var xhr = new XMLHttpRequest();
+	xhr.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+			resp = JSON.parse(this.responseText)
+			document.getElementById("scanner_status").innerHTML = resp.scanner_status
+      document.getElementById("download_button").disabled = !resp.download_ready; 
+      progressbar.draw(resp.progress, resp.progress_text)
+      if (resp.is_scan_active) {
+		    setTimeout(updateScannerDetails, 1000)
+		  }
+		}
+	};
+	xhr.open("GET", "get_scanner_details", true);
+	xhr.send();
+}
+
+var progressbar = {
+	
+	draw: function (percentage, text) {
+    // set the background to the current percentage
+    document.getElementById("progressBar").style.backgroundSize = percentage + "% 100%";
+    // set the text
+    document.getElementById("progressInformation").innerHTML = text;
+	}
+};
+
+updateScannerDetails();
+
+</script>
+
+</body>
+</html>
