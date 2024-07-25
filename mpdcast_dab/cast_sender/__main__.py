@@ -76,7 +76,7 @@ def read_mpd_config(config):
 
 async def setup_webserver(runner, port):
   await runner.setup()
-  site = web.TCPSite(runner, '0.0.0.0', port)
+  site = web.TCPSite(runner, '0.0.0.0', port, shutdown_timeout=0.1)
   await site.start()
 
 
