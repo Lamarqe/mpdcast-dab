@@ -19,6 +19,9 @@ class DabServer():
     if device.is_usable():
       self.radio_controller = RadioController(device)
       self.scanner = DabScanner(device)
+    else:
+      self.radio_controller = None
+      self.scanner = None
 
     self.handlers = {}
     self._shutdown_in_progress = False

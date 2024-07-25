@@ -129,7 +129,8 @@ def main():
   web_app = web.Application()
   web_app.add_routes([web.get(r'', get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
   web_app.add_routes(image_request_handler.get_routes())
-  web_app.add_routes(dab_server.get_routes())
+  if dab_server.radio_controller:
+    web_app.add_routes(dab_server.get_routes())
   runner = web.AppRunner(web_app)
 
   cast_receiver_url = 'http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE
@@ -148,7 +149,8 @@ def main():
 
   except KeyboardInterrupt:
     loop.run_until_complete(mpd_caster.stop())
-    loop.run_until_complete(dab_server.stop())
+    if dab_server.radio_controller:
+      loop.run_until_complete(dab_server.stop())
     loop.run_until_complete(runner.cleanup())
     stdout_grabber.cleanup()
     stderr_grabber.cleanup()
