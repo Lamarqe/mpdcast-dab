@@ -131,6 +131,8 @@ def main():
   web_app.add_routes(image_request_handler.get_routes())
   if dab_server.radio_controller:
     web_app.add_routes(dab_server.get_routes())
+  else:
+    logger.warning('No DAB device available')
   runner = web.AppRunner(web_app)
 
   cast_receiver_url = 'http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE
