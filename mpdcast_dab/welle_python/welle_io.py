@@ -111,16 +111,19 @@ class DabDevice():
     if not self._capsule:
       return False
     else:
-      program_forwarder = CallbackForwarder()
-      program_forwarder.forward_object = handler
-      program_forwarder._loop = asyncio.get_event_loop()
-      return welle_io.subscribe_program(self._capsule, program_forwarder, service_id)
+      self._program_forwarder = CallbackForwarder()
+      self._program_forwarder.forward_object = handler
+      self._program_forwarder._loop = asyncio.get_event_loop()
+      return welle_io.subscribe_program(self._capsule, self._program_forwarder, service_id)
 
   def unsubscribe_program(self, service_id: int) -> bool:
     if not self._capsule:
       return False
+    elif welle_io.unsubscribe_program(self._capsule, service_id):
+      self._program_forwarder = None
+      return True
     else:
-      return welle_io.unsubscribe_program(self._capsule, service_id)
+      return False
 
   def cleanup(self) -> None:
     if self._capsule:
