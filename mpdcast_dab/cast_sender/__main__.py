@@ -90,7 +90,7 @@ def updateLoggerConfig(quiet):
   logging.getLogger("Welle.io").setLevel(external_log_level)
 
 async def get_webui(request):
-  return web.FileResponse(os.path.dirname(__file__)  + '/usr/share/mpdcast-dab/webui/index.htm')
+  return web.FileResponse('/usr/share/mpdcast-dab/webui/index.htm')
 
 def main():
   CAST_PATH = '/cast_receiver'
