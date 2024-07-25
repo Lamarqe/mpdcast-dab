@@ -100,23 +100,7 @@ def main():
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent')
   parser.add_argument('--quiet', help = 'Disable verbose output', action = 'store_true')
   parser.add_argument('--conf', help = 'mpd config file to use. Default: /etc/mpd.conf', default = '/etc/mpd.conf')
-
   args = vars(parser.parse_args())
-
-  my_ip = get_first_ipv4_address()
-  if not my_ip:
-    print ('Fatal: could not retrieve local IP address')
-    exit(1)
-
-  try:
-    mpd_config = load_mpd_config(args['conf'])
-    mpd_port, device_name, streaming_port = read_mpd_config(mpd_config)
-  except SyntaxError as syntax_error:
-    print('Fatal: failed to parse MPD config file ' + args['conf'] + ':')
-    print(str(syntax_error))
-    exit(1)
-
-  image_request_handler = imageserver.ImageRequestHandler(my_ip, WEB_PORT)
 
   stdout_grabber = OutputGrabber(sys.stdout, 'Welle.io', logging.Logger.error)
   stderr_grabber = OutputGrabber(sys.stderr, 'Welle.io', logging.Logger.warning)
@@ -124,34 +108,63 @@ def main():
   sys.stderr = stderr_grabber.redirect_stream()
   updateLoggerConfig(args['quiet'])
   
+  init_mpdcast_ok = True
+  my_ip = get_first_ipv4_address()
+  if not my_ip:
+    logger.warning('Could not retrieve local IP address')
+    init_mpdcast_ok = False
+    # Set up fallback that can be used for DAB playlist creation
+    my_ip = '127.0.0.1'
+
+  cast_receiver_url = 'http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE
+  try:
+    mpd_config = load_mpd_config(args['conf'])
+    mpd_port, device_name, streaming_port = read_mpd_config(mpd_config)
+  except (FileNotFoundError, SyntaxError) as error:
+    logger.warning('Failed to parse MPD config file')
+    logger.warning(str(error))
+    init_mpdcast_ok = False
+
+  image_request_handler = imageserver.ImageRequestHandler(my_ip, WEB_PORT)
+
   dab_server = DabServer(my_ip, WEB_PORT)
+  init_dab_ok = True if (dab_server.radio_controller is not None) else False
 
   web_app = web.Application()
   web_app.add_routes([web.get(r'', get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
   web_app.add_routes(image_request_handler.get_routes())
-  if dab_server.radio_controller:
+  if init_dab_ok:
     web_app.add_routes(dab_server.get_routes())
   else:
     logger.warning('No DAB device available')
-  runner = web.AppRunner(web_app)
 
-  cast_receiver_url = 'http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE
-  
+  if not init_mpdcast_ok and not init_dab_ok:
+    logger.error('Fatal. Both MpdCast and DAB processing failed to initialize. Exiting.')
+    stdout_grabber.cleanup()
+    stderr_grabber.cleanup()
+    sys.exit(1)
+
+  runner = web.AppRunner(web_app)
   try:
     loop = asyncio.get_event_loop()
     loop.run_until_complete(setup_webserver(runner, WEB_PORT))
 
     # run the webserver in parallel to the cast task
     while True:
-      # wait until we find the cast device in the network
-      mpd_caster = MpdCaster(my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_request_handler)
-      mpd_caster.waitfor_and_register_device()
-      # run the cast (until chromecast disconnects)
-      loop.run_until_complete(mpd_caster.cast_forever())
+      if init_mpdcast_ok:
+        # wait until we find the cast device in the network
+        mpd_caster = MpdCaster(my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_request_handler)
+        mpd_caster.waitfor_and_register_device()
+        # run the cast (until chromecast disconnects)
+        loop.run_until_complete(mpd_caster.cast_forever())
+      else:
+        # DAB processing is fully built into the web server. no additional tasks required
+        loop.run_until_complete(asyncio.sleep(3600))
 
   except KeyboardInterrupt:
-    loop.run_until_complete(mpd_caster.stop())
-    if dab_server.radio_controller:
+    if init_mpdcast_ok:
+      loop.run_until_complete(mpd_caster.stop())
+    if init_dab_ok:
       loop.run_until_complete(dab_server.stop())
     loop.run_until_complete(runner.cleanup())
     stdout_grabber.cleanup()
