@@ -108,7 +108,10 @@ def main():
   sys.stderr = stderr_grabber.redirect_stream()
   updateLoggerConfig(args['quiet'])
   
+  # Initialize some status vars
   init_mpdcast_ok = True
+  init_dab_ok     = True
+
   my_ip = get_first_ipv4_address()
   if not my_ip:
     logger.warning('Could not retrieve local IP address')
@@ -121,28 +124,30 @@ def main():
     mpd_config = load_mpd_config(args['conf'])
     mpd_port, device_name, streaming_port = read_mpd_config(mpd_config)
   except (FileNotFoundError, SyntaxError) as error:
-    logger.warning('Failed to parse MPD config file')
+    logger.warning('Failed to read MPD Cast configuration. Disabling.')
     logger.warning(str(error))
     init_mpdcast_ok = False
 
-  image_request_handler = imageserver.ImageRequestHandler(my_ip, WEB_PORT)
-
   dab_server = DabServer(my_ip, WEB_PORT)
-  init_dab_ok = True if (dab_server.radio_controller is not None) else False
-
-  web_app = web.Application()
-  web_app.add_routes([web.get(r'', get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
-  web_app.add_routes(image_request_handler.get_routes())
-  if init_dab_ok:
-    web_app.add_routes(dab_server.get_routes())
-  else:
+  if dab_server.radio_controller is None:
     logger.warning('No DAB device available')
+    init_dab_ok = False
 
   if not init_mpdcast_ok and not init_dab_ok:
     logger.error('Fatal. Both MpdCast and DAB processing failed to initialize. Exiting.')
     stdout_grabber.cleanup()
     stderr_grabber.cleanup()
     sys.exit(1)
+
+  web_app = web.Application()
+
+  if init_mpdcast_ok:
+    web_app.add_routes([web.get(r'', get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
+    image_request_handler = imageserver.ImageRequestHandler(my_ip, WEB_PORT)
+    web_app.add_routes(image_request_handler.get_routes())
+
+  if init_dab_ok:
+    web_app.add_routes(dab_server.get_routes())
 
   runner = web.AppRunner(web_app)
   try:
