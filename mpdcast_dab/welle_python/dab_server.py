@@ -21,6 +21,7 @@ class DabServer():
       self.scanner = DabScanner(device)
 
     self.handlers = {}
+    self._shutdown_in_progress = False
 
   def get_routes(self):
     return [web.get('/DAB.m3u8', self.get_scanner_playlist),
@@ -45,6 +46,7 @@ class DabServer():
     return web.Response(body = json.dumps(resp), content_type = 'application/json')
 
   async def stop(self):
+    self._shutdown_in_progress = True
     await self.radio_controller.unsubscribe_all_programs()
 
 
@@ -126,6 +128,9 @@ class DabServer():
 
 
   async def get_audio(self, request, retry = True):
+    if self._shutdown_in_progress:
+      raise web.HTTPServiceUnavailable()
+
     channel = request.match_info['channel']
     program = request.match_info['program']  
     if program.startswith('cover.'):
