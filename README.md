@@ -71,7 +71,7 @@ The following libraries and their development files are needed:
 
 Debian / Ubuntu Linux
 ---
-This section shows how to compile welle.io on Debian or Ubuntu (tested with Ubuntu 24.04).
+This section shows how to compile MpdCast DAB on Debian or Ubuntu (tested with Ubuntu 24.04).
 
 1. Install the base requirements
 
