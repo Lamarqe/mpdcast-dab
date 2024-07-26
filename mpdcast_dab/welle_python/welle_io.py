@@ -140,5 +140,11 @@ class DabDevice():
     else:
       return welle_io.get_service_name(self._capsule, service_id)
 
+  def is_audio_service(self, service_id: int) -> bool:
+    if not self._capsule:
+      return None
+    else:
+      return welle_io.is_audio_service(self._capsule, service_id)
+
   def all_channel_names() -> list[str]:
     return welle_io.all_channel_names()

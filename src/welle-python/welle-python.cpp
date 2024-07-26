@@ -13,6 +13,7 @@ extern "C" {
   PyObject* stop_device         (PyObject *self, PyObject *args);
   PyObject* finalize            (PyObject *self, PyObject *args);
   PyObject* get_service_name    (PyObject *self, PyObject *args);
+  PyObject* is_audio_service    (PyObject *self, PyObject *args);
   PyObject* PyInit_libwelle_py  (void);
 }
 
@@ -266,6 +267,24 @@ class PythonRadioController : public RadioControllerInterface {
         return Py_NewRef(Py_None);
     }
 
+    virtual PyObject* is_audio_service(uint32_t sId)
+    {
+      const Service& srv = rx->getService(sId);
+      if (srv.serviceId != 0) 
+      {
+				for (const ServiceComponent& sc : rx->getComponents(srv))
+				{
+          if (sc.transportMode() == TransportMode::Audio &&
+					    sc.audioType() == AudioServiceComponentType::DABPlus)
+					return Py_NewRef(Py_True);
+				}
+        // no audio service
+			  return Py_NewRef(Py_False);
+			}
+      // service unknown
+			return Py_NewRef(Py_None);
+    }
+
     virtual void onSNR(float snr) override
     { 
 //      pool.enqueue([snr, this]
@@ -479,6 +498,17 @@ PyObject *get_service_name (PyObject */*self*/, PyObject *args)
   return ri->get_service_name(sId);
 }
 
+PyObject *is_audio_service (PyObject */*self*/, PyObject *args)
+{
+  PyObject  *handle_capsule;
+  uint32_t sId;
+
+  PyArg_ParseTuple (args, "OI", &handle_capsule, &sId);
+  PythonRadioController* ri = reinterpret_cast<PythonRadioController*>(PyCapsule_GetPointer (handle_capsule, "library_object"));
+
+  return ri->is_audio_service(sId);
+}
+
 PyObject *unsubscribe_program (PyObject */*self*/, PyObject *args) {
   PyObject  *handle_capsule;
   uint32_t sId;
@@ -530,6 +560,7 @@ static PyMethodDef module_methods [] = {
   {"close_device",        close_device,        METH_VARARGS, ""},
   {"finalize",            finalize,            METH_VARARGS, ""},
   {"get_service_name",    get_service_name,    METH_VARARGS, ""},
+  {"is_audio_service",    is_audio_service,    METH_VARARGS, ""},
   {"all_channel_names",   all_channel_names,   METH_VARARGS, ""},
   {NULL, NULL, 0, NULL}
 };

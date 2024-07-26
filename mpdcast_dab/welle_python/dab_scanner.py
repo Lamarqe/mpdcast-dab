@@ -110,9 +110,9 @@ class DabScanner(RadioControllerInterface):
 
   async def onServiceDetected(self, sId):
     current_channel = list(self.scan_results.keys())[-1]
-		# TODO: Filter data channels via rx->getComponents(s).transportMode()) case TransportMode::Audio:
-    if not sId in self.scan_results[current_channel].keys() and sId <= 0xFFFF:
-      self.scan_results[current_channel][sId] = {}
+    if not sId in self.scan_results[current_channel].keys():
+      if self._dab_device.is_audio_service(sId):
+        self.scan_results[current_channel][sId] = {}
 
   async def onSignalPresence(self, isSignal):
     self._is_signal = isSignal
