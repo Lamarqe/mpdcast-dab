@@ -1,9 +1,14 @@
 # MpdCast DAB
 =====================
 
-MPD to Google cast streaming application with support for DAB+ radio
+MpdCast DAB combines two major functionalitities: 
+* DAB+ streaming server with support for radio text and live pictures
+* MPD to Google cast streaming application, including song / program details (text and pictures) for
+    * MPD local database
+    * TvHeadend
+    * The included DAB+ streaming server itself
 
-MpdCast DAB is a fork from welle.io (https://github.com/AlbrechtL/welle.io).
+MpdCast DAB uses the DAB+ implementation of welle.io (https://github.com/AlbrechtL/welle.io).
 
 Table of contents
 ====
