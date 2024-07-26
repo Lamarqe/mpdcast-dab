@@ -26,13 +26,16 @@ class WavProgrammeHandler: public ProgrammeHandlerInterface {
 
     WavProgrammeHandler(PyObject* pythonObj): pool(1)
     {
-      this->python_impl = pythonObj;
-      Py_XINCREF (python_impl);
+			PyGILState_STATE gstate  = PyGILState_Ensure ();
+      this->python_impl = Py_NewRef(pythonObj);
+			PyGILState_Release (gstate);
     }
 
     virtual ~WavProgrammeHandler() 
     {
-      Py_XDECREF (python_impl);
+			PyGILState_STATE gstate  = PyGILState_Ensure ();
+      Py_DecRef(this->python_impl);
+			PyGILState_Release (gstate);
     }
     
     WavProgrammeHandler           (const WavProgrammeHandler& other)  = delete;
