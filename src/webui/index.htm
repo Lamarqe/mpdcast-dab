@@ -28,7 +28,7 @@ html * {
 }
 
 #progressBarHolder {
-  width: 600px;
+  width: 500px;
   margin-top: 20px;
 }
 
@@ -72,12 +72,15 @@ button[disabled]{
     <button type="button" onclick="start_scan();">Start scan</button> 
   </div>
   <div class="column">
+    <button type="button" onclick="stop_scan();">Stop scan</button> 
+  </div>
+  <div class="column">
 		<form method="get" action="DAB.m3u8">
 			 <button type="submit" id="download_button" disabled="true">Download playlist</button>
 		</form>
   </div>
-  <div class="column" id=scanner_status>
-  </div>
+</div>
+<div class="rowfull" id=scanner_status>&nbsp;
 </div>
 <div id="progressBarHolder">
 	<div id="progressBar">
@@ -99,6 +102,12 @@ function start_scan () {
 	xhr.send();
 }
 
+function stop_scan () {
+  var xhr = new XMLHttpRequest();
+  document.getElementById("scanner_status").innerHTML = "Stopping scan..."
+	xhr.open("POST", "stop_scan", true);
+	xhr.send();
+}
 
 function updateScannerDetails() {
   var xhr = new XMLHttpRequest();
@@ -108,9 +117,6 @@ function updateScannerDetails() {
 			document.getElementById("scanner_status").innerHTML = resp.scanner_status
       document.getElementById("download_button").disabled = !resp.download_ready; 
       progressbar.draw(resp.progress, resp.progress_text)
-      if (resp.is_scan_active) {
-		    setTimeout(updateScannerDetails, 1000)
-		  }
 		}
 	};
 	xhr.open("GET", "get_scanner_details", true);
@@ -127,7 +133,7 @@ var progressbar = {
 	}
 };
 
-updateScannerDetails();
+setInterval(updateScannerDetails, 1000)
 
 </script>
 

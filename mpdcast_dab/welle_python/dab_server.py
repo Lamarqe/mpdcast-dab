@@ -30,6 +30,7 @@ class DabServer():
     return [web.get('/DAB.m3u8', self.get_scanner_playlist),
             web.get('/get_scanner_details', self.get_scanner_details),
             web.post('/start_scan', self.start_scan),
+            web.post('/stop_scan', self.stop_scan),
             web.get(r'/stream/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_audio),
             web.get(r'/image/current/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_current_image),
             web.get(r'/label/current/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_current_label),
@@ -42,6 +43,10 @@ class DabServer():
 
   async def start_scan(self, request):
     resp = await self.scanner.start_scan()
+    return web.Response(body = json.dumps(resp), content_type = 'application/json')
+
+  async def stop_scan(self, request):
+    resp = self.scanner.stop_scan()
     return web.Response(body = json.dumps(resp), content_type = 'application/json')
 
   async def get_scanner_details(self, request):

@@ -34,7 +34,7 @@ class DabScanner(RadioControllerInterface):
     self._all_channel_names = DabDevice.all_channel_names()
     self.scan_results = {}
     self.ui_status = {}
-    self.ui_status['scanner_status'] = ''
+    self.ui_status['scanner_status'] = '&nbsp;'
     self.ui_status['download_ready'] = False
 
     # internal update notification event
@@ -67,7 +67,9 @@ class DabScanner(RadioControllerInterface):
       discovered_services = 0
       self.ui_status['progress'] = progress
       for services in self.scan_results.values():
-        discovered_services+= len(services)
+        for service_details in services.values():
+          if 'name' in service_details:
+            discovered_services+= 1
       self.ui_status['progress_text'] = str(progress) + '% (' + str(scanned_channels)
       self.ui_status['progress_text']+= ' of ' + str(number_of_channels) + ' channels)'
       self.ui_status['progress_text']+= ' Found ' + str(discovered_services) + ' radio services.'
@@ -77,36 +79,47 @@ class DabScanner(RadioControllerInterface):
       self.ui_status['is_scan_active'] = False
     return self.ui_status
 
+  def stop_scan(self):
+    if self._scanner_task:
+      self._scanner_task.cancel()
+    return { }
+
   async def wait_for_scan_complete(self):
     if self._scanner_task:
       await self._scanner_task
 
   async def _run_scan(self):
-    self.scan_results = {}
-    self.ui_status['download_ready'] = False
     service_count = 0
-    for channel in self._all_channel_names:
-      self.scan_results[channel] = {}
-      # tune to the channel
-      self._dab_device.set_channel(channel, True)
-      await self._signal_presence_event.wait()
-      if self._is_signal:
-        # wait for program detection
-        await asyncio.sleep(DabScanner.PROGRAM_DISCOVERY_TIMEOUT)
+    try:
+      self.scan_results = {}
+      self.ui_status['download_ready'] = False
+      for channel in self._all_channel_names:
+        self.scan_results[channel] = {}
+        # tune to the channel
+        self._dab_device.set_channel(channel, True)
+        await self._signal_presence_event.wait()
+        if self._is_signal:
+          # wait for program detection
+          await asyncio.sleep(DabScanner.PROGRAM_DISCOVERY_TIMEOUT)
 
-        # collect program names
-        for sId in self.scan_results[channel].keys():
-          name = self._dab_device.get_service_name(sId).rstrip()
-          self.scan_results[channel][sId]['name'] = name
-          service_count+= 1
+          # collect program names
+          for sId in self.scan_results[channel].keys():
+            name = self._dab_device.get_service_name(sId).rstrip()
+            self.scan_results[channel][sId]['name'] = name
+            service_count+= 1
       
+        self._dab_device.set_channel('', True)
+    except asyncio.CancelledError:
       self._dab_device.set_channel('', True)
+      self.ui_status['scanner_status'] = 'Scan stopped. Found ' + str(service_count) + ' radio services.'
+      raise
+    finally:
+      # scan finished. release the DAB device and remove strong reference to running task
+      self._dab_device.release()
+      self._scanner_task = None
+      self.ui_status['download_ready'] = (service_count > 0)
 
-    # scan finished. release the DAB device and remove strong reference to running task
-    self._dab_device.release()
-    self._scanner_task = None
     self.ui_status['scanner_status'] = 'Scan finished. Found ' + str(service_count) + ' radio services.'
-    self.ui_status['download_ready'] = True
 
   async def onServiceDetected(self, sId):
     current_channel = list(self.scan_results.keys())[-1]
