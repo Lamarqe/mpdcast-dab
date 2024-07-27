@@ -27,16 +27,16 @@ class WavProgrammeHandler: public ProgrammeHandlerInterface {
 
     WavProgrammeHandler(PyObject* pythonObj): pool(1)
     {
-			PyGILState_STATE gstate  = PyGILState_Ensure ();
+      PyGILState_STATE gstate  = PyGILState_Ensure ();
       this->python_impl = Py_NewRef(pythonObj);
-			PyGILState_Release (gstate);
+      PyGILState_Release (gstate);
     }
 
     virtual ~WavProgrammeHandler() 
     {
-			PyGILState_STATE gstate  = PyGILState_Ensure ();
+      PyGILState_STATE gstate  = PyGILState_Ensure ();
       Py_DecRef(this->python_impl);
-			PyGILState_Release (gstate);
+      PyGILState_Release (gstate);
     }
     
     WavProgrammeHandler           (const WavProgrammeHandler& other)  = delete;
@@ -272,17 +272,17 @@ class PythonRadioController : public RadioControllerInterface {
       const Service& srv = rx->getService(sId);
       if (srv.serviceId != 0) 
       {
-				for (const ServiceComponent& sc : rx->getComponents(srv))
-				{
+        for (const ServiceComponent& sc : rx->getComponents(srv))
+        {
           if (sc.transportMode() == TransportMode::Audio &&
-					    sc.audioType() == AudioServiceComponentType::DABPlus)
-					return Py_NewRef(Py_True);
-				}
+              sc.audioType() == AudioServiceComponentType::DABPlus)
+          return Py_NewRef(Py_True);
+        }
         // no audio service
-			  return Py_NewRef(Py_False);
-			}
+        return Py_NewRef(Py_False);
+      }
       // service unknown
-			return Py_NewRef(Py_None);
+      return Py_NewRef(Py_None);
     }
 
     virtual void onSNR(float snr) override
@@ -546,10 +546,10 @@ PyObject *all_channel_names (PyObject */*self*/, PyObject *args)
   PyObject* result = PyList_New(0);
   PyList_Append(result, PyUnicode_FromString(chans.getCurrentChannel().c_str()));
   for (int i = 1; i < NUMBEROFCHANNELS; ++i)
-	{
+  {
     PyList_Append(result, PyUnicode_FromString(chans.getNextChannel().c_str()));
-  }		
-	return result; 
+  }    
+  return result; 
 }
 
 static PyMethodDef module_methods [] = {
@@ -584,9 +584,9 @@ PyInit_libwelle_py (void) {
   m = PyModule_Create(&welle_io);
   if (m == NULL)
     return NULL;
-	
+  
 // Don't remove the verbose message below. Otherwise, redict of C stdout/stderr fails.
 // At least one char must be printed from C to stdout before mpdcast_dab.cast_sender.OutputGrabber can be used
-	std::cout << "Successfully initialized C library." << std::endl;
+  std::cout << "Successfully initialized C library." << std::endl;
   return m;
 }
