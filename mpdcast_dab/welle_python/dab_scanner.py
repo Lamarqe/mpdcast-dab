@@ -53,9 +53,10 @@ class DabScanner(RadioControllerInterface):
   def get_playlist(self, ip, port):
     playlist = '#EXTM3U\n'
     for channel_name, channel_details in self.scan_results.items():
-      for service in channel_details.values():
-        playlist+= '#EXTINF:-1,' + service['name'] + '\n'
-        playlist+= 'http://' + ip + ':' + str(port) + '/stream/' + channel_name + '/' + urllib.parse.quote(service['name']) + '\n'
+      for service_details in services.values():
+        if 'name' in service_details:
+          playlist+= '#EXTINF:-1,' + service['name'] + '\n'
+          playlist+= 'http://' + ip + ':' + str(port) + '/stream/' + channel_name + '/' + urllib.parse.quote(service['name']) + '\n'
     return playlist
 
   def status(self):
