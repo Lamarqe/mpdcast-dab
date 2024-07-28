@@ -53,10 +53,10 @@ class DabScanner(RadioControllerInterface):
   def get_playlist(self, ip, port):
     playlist = '#EXTM3U\n'
     for channel_name, channel_details in self.scan_results.items():
-      for service_details in services.values():
+      for service_details in channel_details.values():
         if 'name' in service_details:
-          playlist+= '#EXTINF:-1,' + service['name'] + '\n'
-          playlist+= 'http://' + ip + ':' + str(port) + '/stream/' + channel_name + '/' + urllib.parse.quote(service['name']) + '\n'
+          playlist+= '#EXTINF:-1,' + service_details['name'] + '\n'
+          playlist+= 'http://' + ip + ':' + str(port) + '/stream/' + channel_name + '/' + urllib.parse.quote(service_details['name']) + '\n'
     return playlist
 
   def status(self):
@@ -132,38 +132,3 @@ class DabScanner(RadioControllerInterface):
     self._is_signal = isSignal
     self._signal_presence_event.set()
     self._signal_presence_event.clear()
-
-def updateLoggerConfig(quiet):
-  internal_log_level = logging.WARNING if quiet else logging.INFO
-  external_log_level = logging.ERROR   if quiet else logging.WARNING
-  logging.basicConfig(format='%(name)s - %(levelname)s: %(message)s', encoding='utf-8', level=internal_log_level, stream=sys.stdout, force=True)
-  logging.getLogger("Welle.io").setLevel(external_log_level)
-
-def main():
-  parser = argparse.ArgumentParser(description='DAB Scanner')
-  parser.add_argument('--quiet', help = 'Disable verbose output', action = 'store_true')
-  parser.add_argument('--conf', help = 'mpd config file to use. Default: /etc/mpd.conf', default = '/etc/mpd.conf')
-
-  args = vars(parser.parse_args())
-
-  stdout_grabber = OutputGrabber(sys.stdout, 'Welle.io', logging.Logger.error)
-  stderr_grabber = OutputGrabber(sys.stderr, 'Welle.io', logging.Logger.warning)
-  sys.stdout = stdout_grabber.redirect_stream()
-  sys.stderr = stderr_grabber.redirect_stream()
-  updateLoggerConfig(args['quiet'])
-
-  device = DabDevice('auto')
-  
-  dab_scanner = DabScanner(device)
-  loop = asyncio.get_event_loop()
-  try:
-    if loop.run_until_complete(dab_scanner.start_scan()):
-      loop.run_until_complete(dab_scanner.wait_for_scan_complete())
-  except KeyboardInterrupt:
-    pass
-
-  stdout_grabber.cleanup()
-  stderr_grabber.cleanup()
-
-if __name__ == '__main__':
-  main()
