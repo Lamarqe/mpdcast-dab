@@ -80,9 +80,9 @@ async def setup_webserver(runner, port):
   await site.start()
 
 
-def updateLoggerConfig(quiet):
-  internal_log_level = logging.WARNING if quiet else logging.INFO
-  external_log_level = logging.ERROR   if quiet else logging.WARNING
+def updateLoggerConfig(verbose):
+  internal_log_level = logging.INFO    if verbose else logging.WARNING
+  external_log_level = logging.WARNING if verbose else logging.ERROR
   logging.basicConfig(format='%(name)s - %(levelname)s: %(message)s', encoding='utf-8', level=internal_log_level, stream=sys.stdout, force=True)
   logging.getLogger("aiohttp").setLevel(external_log_level)
   logging.getLogger("pychromecast").setLevel(external_log_level)
@@ -98,7 +98,7 @@ def main():
   WEB_PORT = 8080
 
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent')
-  parser.add_argument('--quiet', help = 'Disable verbose output', action = 'store_true')
+  parser.add_argument('--verbose', help = 'Enable verbose output', action = 'store_true')
   parser.add_argument('--conf', help = 'mpd config file to use. Default: /etc/mpd.conf', default = '/etc/mpd.conf')
   args = vars(parser.parse_args())
 
@@ -106,7 +106,7 @@ def main():
   stderr_grabber = OutputGrabber(sys.stderr, 'Welle.io', logging.Logger.warning)
   sys.stdout = stdout_grabber.redirect_stream()
   sys.stderr = stderr_grabber.redirect_stream()
-  updateLoggerConfig(args['quiet'])
+  updateLoggerConfig(args['verbose'])
   
   # Initialize some status vars
   init_mpdcast_ok = True

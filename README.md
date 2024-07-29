@@ -56,7 +56,7 @@ The command-line parameters are:
 
 Parameter | Description | Default Value
 ------ | ---------- | ---------- 
---quiet | Print errors only | False (True when running as systemd service) 
+--verbose | Print debug information | False
 --conf | Path to MPD config | /etc/mpd.conf
 
 Supported Hardware
