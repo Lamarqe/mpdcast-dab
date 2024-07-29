@@ -153,7 +153,14 @@ def main():
   try:
     loop = asyncio.get_event_loop()
     loop.run_until_complete(setup_webserver(runner, WEB_PORT))
+  except Exception as ex:
+    logger.error('Fatal. Could set up web server. Exiting')
+    logger.error(str(ex))
+    stdout_grabber.cleanup()
+    stderr_grabber.cleanup()
+    sys.exit(1)
 
+  try:
     # run the webserver in parallel to the cast task
     while True:
       if init_mpdcast_ok:
