@@ -105,7 +105,7 @@ class RadioController(RadioControllerInterface):
         programme_handler = self._programme_handlers[program_pid]
       else:
         # First time subscription to the channel. Set up the handler and register it.
-        programme_handler = WavProgrammeHandler(self, program_pid)
+        programme_handler = WavProgrammeHandler()
         self._programme_handlers[program_pid] = programme_handler
         if not self._dab_device.subscribe_program(programme_handler, program_pid):
           if not self._programme_handlers:
@@ -114,8 +114,8 @@ class RadioController(RadioControllerInterface):
           return None
 
       # increase the counter of active subscriptions for the selected program
-      programme_handler._subscribers += 1
-      logger.debug('subscribers: %d', programme_handler._subscribers)
+      programme_handler.subscribers += 1
+      logger.debug('subscribers: %d', programme_handler.subscribers)
       return programme_handler
 
 
@@ -139,13 +139,12 @@ class RadioController(RadioControllerInterface):
     if not programme_handler:
       return
 
-    programme_handler._subscribers -= 1
-    logger.debug('subscribers: %d', programme_handler._subscribers)
-    if programme_handler._subscribers == 0:
+    programme_handler.subscribers -= 1
+    logger.debug('subscribers: %d', programme_handler.subscribers)
+    if programme_handler.subscribers == 0:
       self._dab_device.unsubscribe_program(program_pid)
       self._programme_handlers[program_pid]._release_waiters()
       del self._programme_handlers[program_pid]
-      await asyncio.sleep(1)
       if not self._programme_handlers:
         await self._reset()
 
@@ -153,7 +152,6 @@ class RadioController(RadioControllerInterface):
     self._dab_device.set_channel("")
     self._current_channel = None
     self.programs.clear()
-    await asyncio.sleep(1)
     self._dab_device.release()
   
   async def unsubscribe_all_programs(self):

@@ -12,10 +12,8 @@ class UnsubscribedError(Exception):
 class WavProgrammeHandler(ProgrammeHandlerInterface):
   BUFFER_SIZE = 10
 
-  def __init__(self, controller, sId):
-    self._controller = controller
-    self.sId = sId
-    self._subscribers = 0
+  def __init__(self):
+    self.subscribers = 0
 
     self._next_frame = 0
     self._audio_data = [b''] * WavProgrammeHandler.BUFFER_SIZE
