@@ -256,7 +256,7 @@ class PythonRadioController : public RadioControllerInterface {
 
     virtual PyObject* get_service_name(uint32_t sId)
     {
-      Service srv = rx->getService(sId);
+      const Service& srv = rx->getService(sId);
       if (srv.serviceId != 0) 
       {
         std::string label = srv.serviceLabel.utf8_label();
