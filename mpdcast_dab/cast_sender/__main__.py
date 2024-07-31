@@ -1,28 +1,45 @@
 #!/usr/bin/env python3
 # coding=utf-8
 
-import io
+# Copyright (C) 2024 Lamarqe
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+"""Main class which starts cast sender and DAB server"""
+
 import os
 import sys
 import asyncio
 import argparse
-import socket
-import ifaddr
-import time
 import logging
+import re
+import tomllib
+import ifaddr
 from aiohttp import web
-
-import threading
-import traceback
 
 if __name__ == '__main__':
   sys.path.append(os.path.dirname(__file__)  + '/../..')
 
-from mpdcast_dab.cast_sender.output_grabber import *
-import mpdcast_dab.cast_sender.imageserver as imageserver
-from mpdcast_dab.cast_sender.mpd_caster import *
-
+from mpdcast_dab.cast_sender.output_grabber import OutputGrabber
+from mpdcast_dab.cast_sender.imageserver import ImageRequestHandler
+from mpdcast_dab.cast_sender.mpd_caster import MpdCaster
 from mpdcast_dab.welle_python.dab_server import DabServer
+
+logger = logging.getLogger(__name__)
+
+CAST_PATH = '/cast_receiver'
+CAST_PAGE = 'receiver.html'
+WEB_PORT = 8080
 
 def get_first_ipv4_address():
   for iface in ifaddr.get_adapters():
@@ -35,17 +52,14 @@ def get_first_ipv4_address():
 
 def load_mpd_config(config_filename):
   logger.info('Loading config from %s', config_filename)
-  cfg_file = open(config_filename, "r")
-  confStr = cfg_file.read()
-
-  # convert curly brace groups to toml arrays
-  confStr = re.sub(r"\n([^\s#]*?)\s*{(.*?)}", r"\n[[\1]]\2\n", confStr, flags=re.S, count=0)
-  # separate key and value with equals sign
-  confStr = re.sub(r"^\s*(\w+)\s*(.*)$", r"\1 = \2", confStr, flags=re.M, count=0)
-  # now the config should adhere to toml spec.
-  mpd_config = tomllib.loads(confStr)
-  cfg_file.close()
-
+  with open(config_filename, 'r', encoding='utf-8') as cfg_file:
+    config_string = cfg_file.read()
+    # convert curly brace groups to toml arrays
+    config_string = re.sub(r"\n([^\s#]*?)\s*{(.*?)}", r"\n[[\1]]\2\n", config_string, flags=re.S, count=0)
+    # separate key and value with equals sign
+    config_string = re.sub(r"^\s*(\w+)\s*(.*)$", r"\1 = \2", config_string, flags=re.M, count=0)
+    # now the config should adhere to toml spec.
+    mpd_config = tomllib.loads(config_string)
   return mpd_config
 
 def read_mpd_config(config):
@@ -80,10 +94,12 @@ async def setup_webserver(runner, port):
   await site.start()
 
 
-def updateLoggerConfig(verbose):
+def update_logger_config(verbose):
   internal_log_level = logging.INFO    if verbose else logging.WARNING
   external_log_level = logging.WARNING if verbose else logging.ERROR
-  logging.basicConfig(format='%(name)s - %(levelname)s: %(message)s', encoding='utf-8', level=internal_log_level, stream=sys.stdout, force=True)
+  logging.basicConfig(format='%(name)s - %(levelname)s: %(message)s',
+                      encoding='utf-8', level=internal_log_level,
+                      stream=sys.stdout, force=True)
   logging.getLogger("aiohttp").setLevel(external_log_level)
   logging.getLogger("pychromecast").setLevel(external_log_level)
   logging.getLogger("zeroconf").setLevel(external_log_level)
@@ -93,10 +109,6 @@ async def get_webui(request):
   return web.FileResponse('/usr/share/mpdcast-dab/webui/index.htm')
 
 def main():
-  CAST_PATH = '/cast_receiver'
-  CAST_PAGE = 'receiver.html'
-  WEB_PORT = 8080
-
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent')
   parser.add_argument('--verbose', help = 'Enable verbose output', action = 'store_true')
   parser.add_argument('--conf', help = 'mpd config file to use. Default: /etc/mpd.conf', default = '/etc/mpd.conf')
@@ -106,8 +118,8 @@ def main():
   stderr_grabber = OutputGrabber(sys.stderr, 'Welle.io', logging.Logger.warning)
   sys.stdout = stdout_grabber.redirect_stream()
   sys.stderr = stderr_grabber.redirect_stream()
-  updateLoggerConfig(args['verbose'])
-  
+  update_logger_config(args['verbose'])
+
   # Initialize some status vars
   init_mpdcast_ok = True
   init_dab_ok     = True
@@ -143,7 +155,7 @@ def main():
 
   if init_mpdcast_ok:
     web_app.add_routes([web.get(r'', get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
-    image_request_handler = imageserver.ImageRequestHandler(my_ip, WEB_PORT)
+    image_request_handler = ImageRequestHandler(my_ip, WEB_PORT)
     web_app.add_routes(image_request_handler.get_routes())
 
   if init_dab_ok:

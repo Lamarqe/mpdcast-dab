@@ -1,25 +1,25 @@
-import io
-import os
-import sys
+# Copyright (C) 2024 Lamarqe
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+"""DAB Scanner to find all DAB radio services and generate a playlist."""
+
 import asyncio
-import argparse
-import socket
-import ifaddr
-import time
 import logging
 import urllib
-from aiohttp import web
-
-import threading
-import traceback
-logger = logging.getLogger(__name__)
-
-if __name__ == '__main__':
-  sys.path.append(os.path.dirname(__file__)  + '/../..')
-
-from mpdcast_dab.cast_sender.output_grabber import *
-
 from mpdcast_dab.welle_python.welle_io import RadioControllerInterface, DabDevice
+
+logger = logging.getLogger(__name__)
 
 class DabScanner(RadioControllerInterface):
   PROGRAM_DISCOVERY_TIMEOUT = 10
@@ -53,7 +53,9 @@ class DabScanner(RadioControllerInterface):
       for service_details in channel_details.values():
         if 'name' in service_details:
           playlist+= '#EXTINF:-1,' + service_details['name'] + '\n'
-          playlist+= 'http://' + ip + ':' + str(port) + '/stream/' + channel_name + '/' + urllib.parse.quote(service_details['name']) + '\n'
+          playlist+= 'http://' + ip + ':' + str(port)
+          playlist+= '/stream/' + channel_name
+          playlist+= '/' + urllib.parse.quote(service_details['name']) + '\n'
     return playlist
 
   def status(self):
@@ -101,11 +103,11 @@ class DabScanner(RadioControllerInterface):
           await asyncio.sleep(DabScanner.PROGRAM_DISCOVERY_TIMEOUT)
 
           # collect program names
-          for sId in self.scan_results[channel].keys():
-            name = self._dab_device.get_service_name(sId).rstrip()
-            self.scan_results[channel][sId]['name'] = name
+          for service_id in self.scan_results[channel].keys():
+            name = self._dab_device.get_service_name(service_id).rstrip()
+            self.scan_results[channel][service_id]['name'] = name
             service_count+= 1
-      
+
         self._dab_device.set_channel('', True)
     except asyncio.CancelledError:
       self._dab_device.set_channel('', True)
@@ -115,17 +117,17 @@ class DabScanner(RadioControllerInterface):
       # scan finished. release the DAB device and remove strong reference to running task
       self._dab_device.release()
       self._scanner_task = None
-      self.ui_status['download_ready'] = (service_count > 0)
+      self.ui_status['download_ready'] = bool(service_count > 0)
 
     self.ui_status['scanner_status'] = 'Scan finished. Found ' + str(service_count) + ' radio services.'
 
-  async def onServiceDetected(self, sId):
+  async def on_service_detected(self, service_id):
     current_channel = list(self.scan_results.keys())[-1]
-    if not sId in self.scan_results[current_channel].keys():
-      if self._dab_device.is_audio_service(sId):
-        self.scan_results[current_channel][sId] = {}
+    if not service_id in self.scan_results[current_channel].keys():
+      if self._dab_device.is_audio_service(service_id):
+        self.scan_results[current_channel][service_id] = {}
 
-  async def onSignalPresence(self, isSignal):
-    self._is_signal = isSignal
+  async def on_signal_presence(self, is_signal):
+    self._is_signal = is_signal
     self._signal_presence_event.set()
     self._signal_presence_event.clear()

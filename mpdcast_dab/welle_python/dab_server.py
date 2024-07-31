@@ -1,17 +1,33 @@
+# Copyright (C) 2024 Lamarqe
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+"""DAB Web request processing module."""
+
 import asyncio
 import json
-from aiohttp import web
 import logging
-logger = logging.getLogger(__name__)
+from aiohttp import web
 
 from mpdcast_dab.welle_python.radio_controller import RadioController
 from mpdcast_dab.welle_python.dab_scanner import DabScanner
 from mpdcast_dab.welle_python.wav_programme_handler import UnsubscribedError
 from mpdcast_dab.welle_python.welle_io import DabDevice
 
+logger = logging.getLogger(__name__)
 
 class DabServer():
-  
+
   def __init__(self, my_ip, port):
     self.my_ip = my_ip
     self.port = port
@@ -60,13 +76,14 @@ class DabServer():
 
   # is_float should only be true if the audio data is in 32-bit floating-point format.
   def wav_header(self, is_float, channels, bit_rate, sample_rate):
-    bo = 'little'; enc = 'ascii'
-          # RIFF header
+    bo = 'little'
+    enc = 'ascii'
+    # RIFF header
     return (bytes('RIFF', enc)                                         # Chunk ID
           + (0).to_bytes(4, bo)                                        # Chunk size: stream -> set to zero
           + bytes('WAVE', enc)                                         # Format
 
-          # Sub-chunk 1                                                
+          # Sub-chunk 1
           + bytes('fmt ', enc)                                         # Sub-chunk 1 ID
           + (16).to_bytes(4, bo)                                       # Sub-chunk 1 size
           + (3 if is_float else 1).to_bytes(2, bo)                     # Audio format (floating point (3) or PCM (1))
@@ -76,13 +93,13 @@ class DabServer():
           + (channels * (bit_rate // 8)).to_bytes(2, bo)               # Block align
           + bit_rate.to_bytes(2, bo)                                   # Bits per sample
 
-          # Sub-chunk 2                                            
+          # Sub-chunk 2
           + bytes('data', enc)                                         # Sub-chunk 2 ID
           + (0).to_bytes(4, bo))                                       # Sub-chunk 2 size: stream -> set to zero
 
   async def get_next_image(self, request):
     channel = request.match_info['channel']
-    program = request.match_info['program'] 
+    program = request.match_info['program']
     logger.debug('get_next_image: channel: %s program: %s', channel, program)
     if program in self.handlers:
       try:
@@ -90,49 +107,48 @@ class DabServer():
         return web.Response(body = image['data'],
                             content_type = image['type'],
                             headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
-      except UnsubscribedError:
-        raise web.HTTPBadRequest()
+      except UnsubscribedError as exc:
+        raise web.HTTPBadRequest() from exc
     else:
       raise web.HTTPNotFound()
 
 
   async def get_next_label(self, request):
     channel = request.match_info['channel']
-    program = request.match_info['program'] 
+    program = request.match_info['program']
     logger.debug('get_next_label: channel: %s program: %s', channel, program)
     if program in self.handlers:
       try:
         label = await self.handlers[program].new_label()
         return web.Response(text=label,
                             headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
-      except UnsubscribedError:
-        raise web.HTTPBadRequest()
+      except UnsubscribedError as exc:
+        raise web.HTTPBadRequest() from exc
     else:
       raise web.HTTPNotFound()
 
 
   async def get_current_image(self, request):
     channel = request.match_info['channel']
-    program = request.match_info['program']  
+    program = request.match_info['program']
     logger.debug('get_current_image: channel: %s program: %s', channel, program)
-    if (program in self.handlers and
-        len(self.handlers[program].picture['data']) > 0):
-        return web.Response(body = self.handlers[program].picture['data'],
-                            content_type = self.handlers[program].picture['type'],
-                            headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
-    else:
-      raise web.HTTPNotFound()
+    if (program in self.handlers and len(self.handlers[program].picture['data']) > 0):
+      return web.Response(body = self.handlers[program].picture['data'],
+                          content_type = self.handlers[program].picture['type'],
+                          headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
+    # no data found
+    raise web.HTTPNotFound()
 
 
   async def get_current_label(self, request):
     channel = request.match_info['channel']
-    program = request.match_info['program']  
+    program = request.match_info['program']
     logger.debug('get_current_label: channel: %s program: %s', channel, program)
     if program in self.handlers:
       return web.Response(text=self.handlers[program].label,
                           headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
-    else:
-      raise web.HTTPNotFound()
+    # no data found
+    raise web.HTTPNotFound()
 
 
   async def get_audio(self, request, retry = True):
@@ -140,22 +156,23 @@ class DabServer():
       raise web.HTTPServiceUnavailable()
 
     channel = request.match_info['channel']
-    program = request.match_info['program']  
+    program = request.match_info['program']
     if program.startswith('cover.'):
       raise web.HTTPNotFound()
     logger.info('new audio request for %s', program)
-    
+
     # Check if the device is busy with streaming another channel
     if retry and self.radio_controller.get_current_channel() and self.radio_controller.get_current_channel() != channel:
-      # This might be a program switch with the new subscription request coming faster then the unsubscribe. 
-			# So lets check by waiting for half a second and then retry. In case of a switch, the unsubscribe will be processed then 
+      # This might be a program switch with the new subscription request coming faster then the unsubscribe.
+      # So lets check by waiting for half a second and then retry.
+      # In case of a switch, the unsubscribe will be processed then
       await asyncio.sleep(0.5)
       await self.get_audio(request, False)
 
     handler = await self.radio_controller.subscribe_program(channel, program)
     if not handler:
       raise web.HTTPServiceUnavailable()
-    
+
     # from here on, the device sends us the audio stream
     # send it via stream response until the user cancels it
     self.handlers[program] = handler
@@ -186,5 +203,5 @@ class DabServer():
     except UnsubscribedError:
       return response
 
-    # Make sure above that this line remains unreachable 
+    # Make sure above that this line remains unreachable
     raise web.HTTPInternalServerError()

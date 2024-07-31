@@ -1,5 +1,16 @@
-from pychromecast import const
-from pychromecast.controllers import media
+# Copyright (C) 2024 Lamarqe
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 """
 This file replicates the google cast web sender message types.
@@ -9,11 +20,15 @@ Relevant sub-package: chrome.cast.media
 Currently, this file only contains a subset of all data types.
 """
 
+from pychromecast import const
+from pychromecast.controllers import media
+
+
 class Image(dict):
   URL    = "url"
   HEIGHT = "height"
   WIDTH  = "width"
-  
+
   def __init__(self, url):
     super().__init__()
     self[Image.URL]    = url
@@ -36,7 +51,7 @@ class MusicTrackMediaMetadata(dict):
   SONGNAME     = "songName"
   TITLE        = "title"
   TRACKNUMBER  = "trackNumber"
-  
+
   def __init__(self):
     super().__init__()
     self[MusicTrackMediaMetadata.METADATATYPE] = media.METADATA_TYPE_MUSICTRACK
@@ -52,7 +67,7 @@ class MediaInfo(dict):
   STREAMTYPE     = "streamType"
   TEXTTRACKSTYLE = "textTrackStyle"
   TRACKS         = "tracks"
-  
+
   def __init__(self, contentId, contentType):
     super().__init__()
     self[MediaInfo.CONTENTID]      = contentId
@@ -63,7 +78,7 @@ class MediaInfo(dict):
     self[MediaInfo.STREAMTYPE]     = None
     self[MediaInfo.TEXTTRACKSTYLE] = None
     self[MediaInfo.TRACKS]         = None
-    
+
 class QueueItem(dict):
   MEDIA            = "media"
   ITEMID           = "itemId"

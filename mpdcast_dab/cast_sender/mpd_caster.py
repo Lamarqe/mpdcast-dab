@@ -1,28 +1,39 @@
+# Copyright (C) 2024 Lamarqe
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+"""MPD http server stream to google cast sync module."""
+
 import asyncio
-import re
-import tomllib
-import pychromecast
-import zeroconf
-import mpd.asyncio
-import argparse
-import time
-import socket
 import time
 import logging
-logger = logging.getLogger(__name__)
+import zeroconf
+import pychromecast
+import mpd.asyncio
 
 from mpdcast_dab.cast_sender.local_media_player import LocalMediaPlayerController, APP_LOCAL
-import mpdcast_dab.cast_sender.imageserver as imageserver
 from mpdcast_dab.cast_sender.cast_finder import CastFinder
 from mpdcast_dab.cast_sender.tvheadend_connector import TvheadendChannel
 from mpdcast_dab.cast_sender.dabserver_connector import DabserverStation
 
+logger = logging.getLogger(__name__)
 
-class MpdCaster(pychromecast.controllers.receiver.CastStatusListener, 
+
+class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
                 pychromecast.socket_client.ConnectionStatusListener,
                 pychromecast.controllers.media.MediaStatusListener):
   """
-  This class is reponsible to cast all media 
+  This class is reponsible to cast all media
   that is played on the mpd http server stream (defined via handed over config)
   to the chromecast device which is listed in the config
 
@@ -42,25 +53,28 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self.chromecast  = None
     self._tvheadend_show_updater    = None
     self._dabserver_current_station = None
+    self._dabserver_label_updater   = None
+    self._dabserver_image_updater   = None
     self._media_event = asyncio.Event()
     self._media_status = None
     self._cast_finder = None
-  
+    self._my_async_loop = None
+
   def waitfor_and_register_device(self):
     self._cast_finder = CastFinder(self.device_name)
-    self._cast_finder.doDiscovery()
+    self._cast_finder.do_discovery()
     if self._cast_finder.device:
       self.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast_finder.device, zeroconf.Zeroconf())
 
       self.chromecast.wait()
-      if (self.chromecast.app_id != pychromecast.IDLE_APP_ID):
+      if self.chromecast.app_id != pychromecast.IDLE_APP_ID:
         self.chromecast.quit_app()
         time.sleep(0.5)
       self.controller = LocalMediaPlayerController(self.cast_receiver_url, False)
       self.chromecast.register_handler(self.controller)   # allows Chromecast to use Local Media Player app
-      self.chromecast.register_connection_listener(self)  # this will call new_connection_status() => re-init from scratch
-      self.controller.register_status_listener(self)      # this will call new_media_status() / load_media_failed()
-      #self.chromecast.register_status_listener(self)      # this will call new_cast_status()  => not of interest
+      self.chromecast.register_connection_listener(self)  # await new_connection_status() => re-init from scratch
+      self.controller.register_status_listener(self)      # await new_media_status() / load_media_failed()
+      #self.chromecast.register_status_listener(self)     # await new_cast_status()  => not of interest
 
     self._cast_finder = None
 
@@ -84,7 +98,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self.controller.play_media(self.cast_url, **args)
     await self._media_event.wait()
     self._media_event.clear()
-  
+
   def _handle_mpd_stop_play(self):
     if self._tvheadend_show_updater:
       self._tvheadend_show_updater.cancel()
@@ -95,7 +109,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self._dabserver_image_updater.cancel()
       self._dabserver_image_updater = None
       self._dabserver_current_station = None
-    
+
     if self.chromecast.status.app_id == APP_LOCAL:
       self.chromecast.wait()
       self.chromecast.quit_app()
@@ -107,12 +121,12 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   async def _check_new_dab_label(self, song_info):
     while True:
       await self._dabserver_current_station.new_label()
-      await self._handle_mpd_new_song(song_info, True)    
+      await self._handle_mpd_new_song(song_info, True)
 
   async def _check_new_dab_image(self, song_info):
     while True:
       await self._dabserver_current_station.new_image()
-      await self._handle_mpd_new_song(song_info, True)    
+      await self._handle_mpd_new_song(song_info, True)
 
   async def _handle_mpd_new_song(self, song_info, dynamic_update = False):
     if not dynamic_update:
@@ -125,7 +139,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
         self._dabserver_image_updater.cancel()
         self._dabserver_image_updater = None
         self._dabserver_current_station = None
-  
+
     song_file = song_info['file']
     image_url = self.default_image
 
@@ -142,13 +156,13 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       tvh_channel = TvheadendChannel(song_file)
       dab_station = DabserverStation(song_file)
 
-      if (self._dabserver_current_station):
+      if self._dabserver_current_station:
         # Label or image update of a DAB station
         title  = self._dabserver_current_station.station_name
         artist = self._dabserver_current_station.label
         image_url = self._dabserver_current_station.image_url
 
-      elif (await tvh_channel.initialize()):
+      elif await tvh_channel.initialize():
         # new TvHeadend URL or EPG update
         tvheadend_image_url = await tvh_channel.image_url()
         if tvheadend_image_url:
@@ -169,32 +183,33 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
           # No EPG data. Show only channel name
           title = tvh_channel.name()
 
-      elif (await dab_station.initialize()):
+      elif await dab_station.initialize():
         logger.info('new DAB station')
         # New DAB station
         self._dabserver_current_station = dab_station
         title  = self._dabserver_current_station.station_name
         artist = self._dabserver_current_station.label
         image_url = self._dabserver_current_station.image_url
-        # Create tasks which will update the image and song details 
+        # Create tasks which will update the image and song details
         self._dabserver_label_updater = asyncio.create_task(self._check_new_dab_label(song_info))
         self._dabserver_image_updater = asyncio.create_task(self._check_new_dab_image(song_info))
 
     else:
       try:
-        picture_dict = await self.mpd_client.readpicture(song_file)        
+        picture_dict = await self.mpd_client.readpicture(song_file)
         if picture_dict:
           image_url = self.image_server.store_song_picture(song_file, picture_dict)
-      except mpd.base.CommandError as exception:
+      except mpd.base.CommandError as exc:
         logger.exception('Received exception from MPD')
+        logger.exception(str(exc))
 
     if not title and 'name' in song_info:
       title = song_info['name']
 
     self.chromecast.wait()
     logger.info('update details: title: %s artist: %s image_url: %s',  title, artist, image_url)
-    self.controller.set_MusicTrackMediaMetadata(title, artist, image_url)
-  
+    self.controller.set_music_track_media_metadata(title, artist, image_url)
+
   def new_cast_status(self, status):
     if self.chromecast:
       logger.info ("Chromecast Session ID: %s",  str(self.chromecast.status.session_id))
@@ -211,12 +226,12 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   async def cast_forever(self):
     self._my_async_loop = asyncio.get_running_loop()
     await self.mpd_client.connect('localhost', self.mpd_port)
-      
+
     processed_mpd_state = ""
     processed_mpd_song  = ""
 
     try:
-      async for subsystem in self.mpd_client.idle():
+      async for _ in self.mpd_client.idle():
         mpd_client_status = await self.mpd_client.status()
         current_mpd_state = mpd_client_status["state"]
         current_mpd_song = await self.mpd_client.currentsong()

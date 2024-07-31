@@ -1,14 +1,30 @@
+# Copyright (C) 2024 Lamarqe
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+"""Controller that receives streaming requests and interacts with the welle.io interface """
+
 import asyncio
 import datetime
 import logging
-logger = logging.getLogger(__name__)
-
-from mpdcast_dab.welle_python.wav_programme_handler import WavProgrammeHandler, UnsubscribedError
+from mpdcast_dab.welle_python.wav_programme_handler import WavProgrammeHandler
 from mpdcast_dab.welle_python.welle_io import RadioControllerInterface, DabDevice
+
+logger = logging.getLogger(__name__)
 
 class RadioController(RadioControllerInterface):
   PROGRAM_DISCOVERY_TIMEOUT = 10
-  
+
   def __init__(self, device: DabDevice):
     self._dab_device = device
     self.programs            = {}
@@ -16,26 +32,27 @@ class RadioController(RadioControllerInterface):
 
     self._current_channel = ''
     self.ensemble_label   = None
+    self.datetime         = None
 
     # lock to prevent parallel initialization from multiple users
     self._subscription_lock = asyncio.Lock()
-    
-  async def onServiceDetected(self, sId):
-    if not sId in self.programs:
-      self.programs[sId] = None
-    
-  async def onSetEnsembleLabel(self, label):
+
+  async def on_service_detected(self, service_id):
+    if not service_id in self.programs:
+      self.programs[service_id] = None
+
+  async def on_set_ensemble_label(self, label):
     self.ensemble_label = label
 
-  async def onDateTimeUpdate(self, timestamp):
+  async def on_datetime_update(self, timestamp):
     self.datetime = datetime.datetime.fromtimestamp(timestamp)
 
-  def _get_program_id(self, program_name):
-    for sId in self.programs:
-      if not self.programs[sId] or len(self.programs[sId]) == 0:
-        self.programs[sId] = self._dab_device.get_service_name(sId).rstrip()
-      if self.programs[sId] == program_name:
-        return sId
+  def _get_program_id(self, lookup_name):
+    for service_id, program_name in self.programs.items():
+      if not program_name or len(program_name) == 0:
+        self.programs[service_id] = self._dab_device.get_service_name(service_id).rstrip()
+      if self.programs[service_id] == lookup_name:
+        return service_id
     # Not found
     return None
 
@@ -45,8 +62,8 @@ class RadioController(RadioControllerInterface):
     program_pid = self._get_program_id(program_name)
     if program_pid:
       return program_pid
-    
-    # wait the defined time for the program discovery 
+
+    # wait the defined time for the program discovery
     # and check every 0.5 seconds if it was succesful
     for _ in range(2 * RadioController.PROGRAM_DISCOVERY_TIMEOUT):
       await asyncio.sleep(0.5)
@@ -55,7 +72,7 @@ class RadioController(RadioControllerInterface):
         return program_pid
     # Not found
     return None
-      
+
 
   # returns handler in case the subscription suceeded, otherwise None
   async def subscribe_program(self, channel, program_name):
@@ -85,7 +102,7 @@ class RadioController(RadioControllerInterface):
 
       # Because the user might cancel the subscription request while waiting,
       # we need to check for CancelledError and ConnectionResetError.
-      # In these cases, we need to reset the c lib to get back to an idle state. 
+      # In these cases, we need to reset the c lib to get back to an idle state.
       except (asyncio.exceptions.CancelledError,
             ConnectionResetError):
         if not self._programme_handlers:
@@ -99,7 +116,7 @@ class RadioController(RadioControllerInterface):
           await self._reset()
         logger.error('The program %s is not part of the channel %s', program_name, channel)
         return None
-       
+
       # the program exists in the channel. Check if there is already an active subscription
       if program_pid in self._programme_handlers:
         programme_handler = self._programme_handlers[program_pid]
@@ -130,8 +147,7 @@ class RadioController(RadioControllerInterface):
     program_pid = self._get_program_id(program_name)
     if not program_pid:
       return False
-    else:
-      return program_pid in self._programme_handlers
+    return program_pid in self._programme_handlers
 
 
   async def _unsubscribe(self, program_pid):
@@ -143,7 +159,7 @@ class RadioController(RadioControllerInterface):
     logger.debug('subscribers: %d', programme_handler.subscribers)
     if programme_handler.subscribers == 0:
       self._dab_device.unsubscribe_program(program_pid)
-      self._programme_handlers[program_pid]._release_waiters()
+      self._programme_handlers[program_pid].release_waiters()
       del self._programme_handlers[program_pid]
       if not self._programme_handlers:
         await self._reset()
@@ -153,12 +169,12 @@ class RadioController(RadioControllerInterface):
     self._current_channel = None
     self.programs.clear()
     self._dab_device.release()
-  
+
   async def unsubscribe_all_programs(self):
     async with self._subscription_lock:
       active_pids = list(self._programme_handlers.keys())
       for program_pid in active_pids:
         await self._unsubscribe(program_pid)
-  
+
   def get_current_channel(self):
     return self._current_channel

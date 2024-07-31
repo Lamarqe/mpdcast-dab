@@ -1,3 +1,18 @@
+/* Copyright (C) 2024 Lamarqe
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License
+ * as published by the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include  <Python.h>
 
 #include "backend/radio-receiver.h"
@@ -49,7 +64,7 @@ class WavProgrammeHandler: public ProgrammeHandlerInterface {
 //      pool.enqueue([frameErrors, this]
 //      {
 //        PyGILState_STATE gstate  = PyGILState_Ensure ();
-//        PyObject *result = PyObject_CallMethod (python_impl, "onFrameErrors", "(i)", frameErrors);
+//        PyObject *result = PyObject_CallMethod (python_impl, "on_frame_errors", "(i)", frameErrors);
 //
 //        if (result)
 //           Py_DECREF (result);
@@ -63,7 +78,7 @@ class WavProgrammeHandler: public ProgrammeHandlerInterface {
       {
         PyGILState_STATE gstate  = PyGILState_Ensure ();
         PyObject* data = PyBytes_FromStringAndSize((const char*)audioData.data(), 2*audioData.size());
-        PyObject *result = PyObject_CallMethod (python_impl, "onNewAudio", "(Nis)", data,
+        PyObject *result = PyObject_CallMethod (python_impl, "on_new_audio", "(Nis)", data,
                                                 sampleRate, mode.c_str());
         if (result)
            Py_DECREF (result);
@@ -76,7 +91,7 @@ class WavProgrammeHandler: public ProgrammeHandlerInterface {
 //      pool.enqueue([uncorrectedErrors, numCorrectedErrors, this]
 //      {
 //        PyGILState_STATE gstate  = PyGILState_Ensure ();
-//        PyObject *result = PyObject_CallMethod (python_impl, "onRsErrors", "(bi)", uncorrectedErrors, numCorrectedErrors);
+//        PyObject *result = PyObject_CallMethod (python_impl, "on_rs_errors", "(bi)", uncorrectedErrors, numCorrectedErrors);
 //
 //        if (result)
 //           Py_DECREF (result);
@@ -89,7 +104,7 @@ class WavProgrammeHandler: public ProgrammeHandlerInterface {
 //      pool.enqueue([aacErrors, this]
 //      {
 //        PyGILState_STATE gstate  = PyGILState_Ensure ();
-//        PyObject *result = PyObject_CallMethod (python_impl, "onAacErrors", "(i)", aacErrors);
+//        PyObject *result = PyObject_CallMethod (python_impl, "on_aac_errors", "(i)", aacErrors);
 //
 //        if (result)
 //           Py_DECREF (result);
@@ -102,7 +117,7 @@ class WavProgrammeHandler: public ProgrammeHandlerInterface {
       pool.enqueue([label, this]
       {
         PyGILState_STATE gstate  = PyGILState_Ensure ();
-        PyObject *result = PyObject_CallMethod (python_impl, "onNewDynamicLabel", "(s)", label.c_str());
+        PyObject *result = PyObject_CallMethod (python_impl, "on_new_dynamic_label", "(s)", label.c_str());
 
         if (result)
           Py_DECREF (result);
@@ -125,7 +140,7 @@ class WavProgrammeHandler: public ProgrammeHandlerInterface {
       {
         PyGILState_STATE gstate  = PyGILState_Ensure ();
         PyObject* data = PyBytes_FromStringAndSize((const char*)mot_file.data.data(), mot_file.data.size());
-        PyObject *result = PyObject_CallMethod (python_impl, "onMOT", "(Nss)", data,
+        PyObject *result = PyObject_CallMethod (python_impl, "on_mot", "(Nss)", data,
                                                 mime_type.c_str(), mot_file.content_name.c_str());
         if (result != NULL)
           Py_DECREF (result);
@@ -290,7 +305,7 @@ class PythonRadioController : public RadioControllerInterface {
 //      pool.enqueue([snr, this]
 //      {
 //        PyGILState_STATE gstate  = PyGILState_Ensure ();
-//        PyObject *result = PyObject_CallMethod (python_impl, "onSNR", "(f)", snr);//
+//        PyObject *result = PyObject_CallMethod (python_impl, "on_snr", "(f)", snr);//
 //
 //        if (result)
 //           Py_DECREF (result);
@@ -303,7 +318,7 @@ class PythonRadioController : public RadioControllerInterface {
 //      pool.enqueue([fine, coarse, this]
 //      {
 //        PyGILState_STATE gstate  = PyGILState_Ensure ();
-//        PyObject *result = PyObject_CallMethod (python_impl, "onFrequencyCorrectorChange", "(ii)", fine, coarse);
+//        PyObject *result = PyObject_CallMethod (python_impl, "on_frequency_corrector_change", "(ii)", fine, coarse);
 //
 //        if (result)
 //           Py_DECREF (result);
@@ -317,7 +332,7 @@ class PythonRadioController : public RadioControllerInterface {
       {
         synced = isSync;
         PyGILState_STATE gstate  = PyGILState_Ensure ();
-        PyObject *result = PyObject_CallMethod (python_impl, "onSyncChange", "(c)", isSync);
+        PyObject *result = PyObject_CallMethod (python_impl, "on_sync_change", "(c)", isSync);
 
         if (result)
            Py_DECREF (result);
@@ -329,7 +344,7 @@ class PythonRadioController : public RadioControllerInterface {
       pool.enqueue([isSignal, this]
       {
         PyGILState_STATE gstate  = PyGILState_Ensure ();
-        PyObject *result = PyObject_CallMethod (python_impl, "onSignalPresence", "(O)", PyBool_FromLong(isSignal));
+        PyObject *result = PyObject_CallMethod (python_impl, "on_signal_presence", "(O)", PyBool_FromLong(isSignal));
 
         if (result)
            Py_DECREF (result);
@@ -342,7 +357,7 @@ class PythonRadioController : public RadioControllerInterface {
       pool.enqueue([sId, this]
       {
         PyGILState_STATE gstate  = PyGILState_Ensure ();
-        PyObject *result = PyObject_CallMethod (python_impl, "onServiceDetected", "(k)", sId);
+        PyObject *result = PyObject_CallMethod (python_impl, "on_service_detected", "(k)", sId);
 
         if (result)
            Py_DECREF (result);
@@ -355,7 +370,7 @@ class PythonRadioController : public RadioControllerInterface {
       pool.enqueue([eId, this]
       {
         PyGILState_STATE gstate  = PyGILState_Ensure ();
-        PyObject *result = PyObject_CallMethod (python_impl, "onNewEnsemble", "(I)", eId);
+        PyObject *result = PyObject_CallMethod (python_impl, "on_new_ensemble", "(I)", eId);
 
         if (result)
            Py_DECREF (result);
@@ -368,7 +383,7 @@ class PythonRadioController : public RadioControllerInterface {
       pool.enqueue([label, this]
       {
         PyGILState_STATE gstate  = PyGILState_Ensure ();
-        PyObject *result = PyObject_CallMethod (python_impl, "onSetEnsembleLabel", "(s)", label.utf8_label().c_str());
+        PyObject *result = PyObject_CallMethod (python_impl, "on_set_ensemble_label", "(s)", label.utf8_label().c_str());
 
         if (result)
           Py_DECREF (result);
@@ -390,7 +405,7 @@ class PythonRadioController : public RadioControllerInterface {
 //        time_t timestamp = mktime(&dabtime);
 //
 //        PyGILState_STATE gstate  = PyGILState_Ensure ();
-//        PyObject *result = PyObject_CallMethod (python_impl, "onDateTimeUpdate", "(i)", timestamp);
+//        PyObject *result = PyObject_CallMethod (python_impl, "on_datetime_update", "(i)", timestamp);
 //
 //        if (result)
 //           Py_DECREF (result);
@@ -404,7 +419,7 @@ class PythonRadioController : public RadioControllerInterface {
 //      {
 //        const uint16_t fiblarge = *fib;
 //        PyGILState_STATE gstate  = PyGILState_Ensure ();
-//        PyObject *result = PyObject_CallMethod (python_impl, "onFIBDecodeSuccess", "(pH)", crcCheckOk, &fiblarge);
+//        PyObject *result = PyObject_CallMethod (python_impl, "on_fib_decode_success", "(pH)", crcCheckOk, &fiblarge);
 //
 //        if (result)
 //           Py_DECREF (result);
@@ -432,7 +447,7 @@ class PythonRadioController : public RadioControllerInterface {
 //        bool isError = (level == message_level_t::Error);
 //
 //        PyGILState_STATE gstate  = PyGILState_Ensure ();
-//        PyObject *result = PyObject_CallMethod (python_impl, "onMessage", "(ssp)", text, text2, isError);
+//        PyObject *result = PyObject_CallMethod (python_impl, "on_message", "(ssp)", text, text2, isError);
 //
 //        if (result)
 //           Py_DECREF (result);

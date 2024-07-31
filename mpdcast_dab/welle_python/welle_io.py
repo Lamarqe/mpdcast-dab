@@ -1,64 +1,79 @@
-from abc import ABC, abstractmethod
+# Copyright (C) 2024 Lamarqe
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License
+# as published by the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import mpdcast_dab.welle_python.libwelle_py as welle_io
+"""Python interface defintions for welle.io python wrapper"""
+
 import asyncio
 import atexit
 import time
 import logging
+import mpdcast_dab.welle_python.libwelle_py as welle_io
+
 logger = logging.getLogger(__name__)
 
 
 class ProgrammeHandlerInterface():
 
-  async def onFrameErrors(self, frameErrors: int) -> None:
+  async def on_frame_errors(self, frame_errors: int) -> None:
     pass
 
-  async def onNewAudio(self, audio_data: bytes, sample_rate: int, mode: str) -> None:
+  async def on_new_audio(self, audio_data: bytes, sample_rate: int, mode: str) -> None:
     pass
 
-  async def onRsErrors(self, uncorrectedErrors: int, numCorrectedErrors: int) -> None:
+  async def on_rs_errors(self, uncorrected_errors: int, num_corrected_errors: int) -> None:
     pass
 
-  async def onAacErrors(self, aacErrors: int) -> None:
+  async def on_aac_errors(self, aac_errors: int) -> None:
     pass
 
-  async def onNewDynamicLabel(self, label: str) -> None:
+  async def on_new_dynamic_label(self, label: str) -> None:
     pass
-    
-  async def onMOT(self, data: bytes, mime_type: str, name: str) -> None:
+
+  async def on_mot(self, data: bytes, mime_type: str, name: str) -> None:
     pass
 
 
 class RadioControllerInterface():
 
-  async def onSNR(self, snr: float) -> None:
-    pass
-    
-  async def onFrequencyCorrectorChange(self, fine: int, coarse: int) -> None:
-    pass
-    
-  async def onSyncChange(self, isSync: int) -> None:
-    pass
-    
-  async def onSignalPresence(self, isSignal: int) -> None:
+  async def on_snr(self, snr: float) -> None:
     pass
 
-  async def onServiceDetected(self, sId: int) -> None:
-    pass
-    
-  async def onNewEnsemble(self, eId: int) -> None:
-    pass
-    
-  async def onSetEnsembleLabel(self, label: str) -> None:
+  async def on_frequency_corrector_change(self, fine: int, coarse: int) -> None:
     pass
 
-  async def onDateTimeUpdate(self, timestamp: int) -> None:
+  async def on_sync_change(self, is_sync: int) -> None:
     pass
 
-  async def onFIBDecodeSuccess(self, crcCheckOk: int, fib: int) -> None:
+  async def on_signal_presence(self, is_signal: int) -> None:
     pass
-    
-  async def onMessage(self, text: str, text2: str, isError: int) -> None:
+
+  async def on_service_detected(self, service_id: int) -> None:
+    pass
+
+  async def on_new_ensemble(self, ensemble_id: int) -> None:
+    pass
+
+  async def on_set_ensemble_label(self, label: str) -> None:
+    pass
+
+  async def on_datetime_update(self, timestamp: int) -> None:
+    pass
+
+  async def on_fib_decode_success(self, crc_check_ok: int, fib: int) -> None:
+    pass
+
+  async def on_message(self, text: str, text2: str, is_error: int) -> None:
     pass
 
 
@@ -73,18 +88,16 @@ class CallbackForwarder():
     self._loop = asyncio.get_event_loop()
 
   def subscribe_for_callbacks(self, target) -> bool:
-    if self._forward_object is not None: 
+    if self._forward_object is not None:
       return False
-    else:
-      self._forward_object = target
-      return True
+    self._forward_object = target
+    return True
 
   def unsubscribe_from_callbacks(self) -> bool:
-    if self._forward_object is None: 
+    if self._forward_object is None:
       return False
-    else:
-      self._forward_object = None
-      return True
+    self._forward_object = None
+    return True
 
   def __getattr__(self, attr):
     method = getattr(self._forward_object, attr)
@@ -111,21 +124,19 @@ class DabDevice():
   def set_channel(self, channel: str, is_scan: bool = False) -> bool:
     if not self._capsule:
       return False
-    else:
-      return welle_io.set_channel(self._capsule, channel, is_scan)
+    return welle_io.set_channel(self._capsule, channel, is_scan)
 
   def subscribe_program(self, handler: ProgrammeHandlerInterface, service_id: int) -> bool:
     if not self._capsule:
       return False
-    else:
-      handler._program_forwarder = CallbackForwarder(handler)
-      return welle_io.subscribe_program(self._capsule, handler._program_forwarder, service_id)
+    forwarder = CallbackForwarder(handler)
+    handler._program_forwarder = forwarder
+    return welle_io.subscribe_program(self._capsule, forwarder, service_id)
 
   def unsubscribe_program(self, service_id: int) -> bool:
     if not self._capsule:
       return False
-    else:
-      return welle_io.unsubscribe_program(self._capsule, service_id)
+    return welle_io.unsubscribe_program(self._capsule, service_id)
 
   def cleanup(self) -> None:
     if self._capsule:
@@ -139,14 +150,13 @@ class DabDevice():
   def get_service_name(self, service_id: int) -> str:
     if not self._capsule:
       return None
-    else:
-      return welle_io.get_service_name(self._capsule, service_id)
+    return welle_io.get_service_name(self._capsule, service_id)
 
   def is_audio_service(self, service_id: int) -> bool:
     if not self._capsule:
       return None
-    else:
-      return welle_io.is_audio_service(self._capsule, service_id)
+    return welle_io.is_audio_service(self._capsule, service_id)
 
+  @staticmethod
   def all_channel_names() -> list[str]:
     return welle_io.all_channel_names()
