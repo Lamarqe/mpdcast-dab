@@ -68,35 +68,42 @@ class CallbackForwarder():
 	# 1: It allows dynamic controller objects in python without having to re-initialize the device in C
   # 2: The indirection includes a thread handover into async which is required anyways
 
+  def __init__(self, target = None):
+    self._forward_object = target
+    self._loop = asyncio.get_event_loop()
+
+  def subscribe_for_callbacks(self, target) -> bool:
+    if self._forward_object is not None: 
+      return False
+    else:
+      self._forward_object = target
+      return True
+
+  def unsubscribe_from_callbacks(self) -> bool:
+    if self._forward_object is None: 
+      return False
+    else:
+      self._forward_object = None
+      return True
+
   def __getattr__(self, attr):
-    method = getattr(self.forward_object, attr)
+    method = getattr(self._forward_object, attr)
     def asyncio_callback(*args, **kwargs):
       asyncio.run_coroutine_threadsafe(method(*args, **kwargs), self._loop)
     return asyncio_callback
 
 class DabDevice():
   def __init__(self, device_name: str = 'auto', gain: int = -1):
-    self._controller_stub = RadioControllerInterface()
     self._forwarder = CallbackForwarder()
-    self._forwarder._loop = asyncio.get_event_loop()
-    self._forwarder.forward_object = self._controller_stub
     self._capsule = welle_io.init_device(self._forwarder, device_name, gain)
     if self._capsule:
       atexit.register(self.cleanup)
 
   def aquire_now(self, radio_controller: RadioControllerInterface) -> bool:
-    if self._forwarder.forward_object == self._controller_stub:
-      self._forwarder.forward_object = radio_controller
-      return True
-    else:
-      return False
+    return self._forwarder.subscribe_for_callbacks(radio_controller)
 
   def release(self) -> bool:
-    if self._forwarder.forward_object != self._controller_stub:
-      self._forwarder.forward_object = self._controller_stub
-      return True
-    else:
-      return False
+    return self._forwarder.unsubscribe_from_callbacks()
 
   def is_usable(self) -> bool:
     return self._capsule is not None
@@ -111,9 +118,7 @@ class DabDevice():
     if not self._capsule:
       return False
     else:
-      handler._program_forwarder = CallbackForwarder()
-      handler._program_forwarder.forward_object = handler
-      handler._program_forwarder._loop = asyncio.get_event_loop()
+      handler._program_forwarder = CallbackForwarder(handler)
       return welle_io.subscribe_program(self._capsule, handler._program_forwarder, service_id)
 
   def unsubscribe_program(self, service_id: int) -> bool:
