@@ -29,7 +29,6 @@ class WavProgrammeHandler(ProgrammeHandlerInterface):
     self._picture_event    = asyncio.Event()
     self._label_event      = asyncio.Event()
     
-    self._caller_loop = asyncio.get_running_loop()
     self._delete_in_progress = False
 
   # notification routines for user applications
