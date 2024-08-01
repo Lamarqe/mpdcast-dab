@@ -101,8 +101,7 @@ class TvheadendChannel():
   def get_remaining_show_time(self):
     if not self._show_end:
       return None
-    else:
-      return int(self._show_end - time.time())
+    return int(self._show_end - time.time())
 
   def name(self):
     return self._channel_data['name']
