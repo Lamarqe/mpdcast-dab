@@ -17,7 +17,6 @@
 
 """Main class which starts cast sender and DAB server"""
 
-import os
 import sys
 import asyncio
 import argparse
