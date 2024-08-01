@@ -27,9 +27,6 @@ import tomllib
 import ifaddr
 from aiohttp import web
 
-if __name__ == '__main__':
-  sys.path.append(os.path.dirname(__file__)  + '/../..')
-
 from mpdcast_dab.cast_sender.output_grabber import OutputGrabber
 from mpdcast_dab.cast_sender.imageserver import ImageRequestHandler
 from mpdcast_dab.cast_sender.mpd_caster import MpdCaster
