@@ -105,15 +105,13 @@ class RadioController(RadioControllerInterface):
       # In these cases, we need to reset the c lib to get back to an idle state.
       except (asyncio.exceptions.CancelledError,
             ConnectionResetError):
-        if not self._programme_handlers:
-          await self._reset()
+        await self._reset_if_no_handler()
         # re-throw the exception so the caller can also do its cleanup
         raise
 
       # The program is not part of the channel
       if not program_pid:
-        if not self._programme_handlers:
-          await self._reset()
+        await self._reset_if_no_handler()
         logger.error('The program %s is not part of the channel %s', program_name, channel)
         return None
 
@@ -125,8 +123,7 @@ class RadioController(RadioControllerInterface):
         programme_handler = WavProgrammeHandler()
         self._programme_handlers[program_pid] = programme_handler
         if not self._dab_device.subscribe_program(programme_handler, program_pid):
-          if not self._programme_handlers:
-            await self._reset()
+          await self._reset_if_no_handler()
           logger.error('Subscription to selected program failed')
           return None
 
@@ -161,8 +158,12 @@ class RadioController(RadioControllerInterface):
       self._dab_device.unsubscribe_program(program_pid)
       self._programme_handlers[program_pid].release_waiters()
       del self._programme_handlers[program_pid]
-      if not self._programme_handlers:
-        await self._reset()
+      await self._reset_if_no_handler()
+
+  async def _reset_if_no_handler(self):
+    if not self._programme_handlers:
+      await self._reset()
+
 
   async def _reset(self):
     self._dab_device.set_channel("")
