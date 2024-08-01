@@ -185,19 +185,8 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
         self._updater.dab_label = asyncio.create_task(self._check_new_dab_label(song_info))
         self._updater.dab_image = asyncio.create_task(self._check_new_dab_image(song_info))
     else:
-      if 'title' in song_info:
-        cast_data.title = song_info['title']
-      elif 'name' in song_info:
-        cast_data.title = song_info['name']
-      else:
-        cast_data.title = None
-
-      if 'artist' in song_info:
-        cast_data.artist = song_info['artist']
       try:
-        picture_dict = await self._mpd_client.readpicture(song_file)
-        if picture_dict:
-          cast_data.image_url = self._config.image_server.store_song_picture(song_file, picture_dict)
+        await self._fill_cast_data(cast_data, song_info)
       except mpd.base.CommandError as exc:
         logger.exception('Received exception from MPD')
         logger.exception(str(exc))
@@ -206,6 +195,21 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     logger.info('update details: title: %s artist: %s image_url: %s',
 		             cast_data.title, cast_data.artist, cast_data.image_url)
     self._cast.controller.set_music_track_media_metadata(cast_data.title, cast_data.artist, cast_data.image_url)
+
+  async def _fill_cast_data(self, cast_data, song_info):
+    song_file = song_info['file']
+    if 'title' in song_info:
+      cast_data.title = song_info['title']
+    elif 'name' in song_info:
+      cast_data.title = song_info['name']
+    else:
+      cast_data.title = None
+
+    if 'artist' in song_info:
+      cast_data.artist = song_info['artist']
+      picture_dict = await self._mpd_client.readpicture(song_file)
+      if picture_dict:
+        cast_data.image_url = self._config.image_server.store_song_picture(song_file, picture_dict)
 
   def new_cast_status(self, status):
     if self._cast.chromecast:
