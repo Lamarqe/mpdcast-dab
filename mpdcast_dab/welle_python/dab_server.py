@@ -132,9 +132,9 @@ class DabServer():
     channel = request.match_info['channel']
     program = request.match_info['program']
     logger.debug('get_current_image: channel: %s program: %s', channel, program)
-    if (program in self.handlers and len(self.handlers[program].picture['data']) > 0):
-      return web.Response(body = self.handlers[program].picture['data'],
-                          content_type = self.handlers[program].picture['type'],
+    if (program in self.handlers and len(self.handlers[program].data.picture['data']) > 0):
+      return web.Response(body = self.handlers[program].data.picture['data'],
+                          content_type = self.handlers[program].data.picture['type'],
                           headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
     # no data found
     raise web.HTTPNotFound()
@@ -145,7 +145,7 @@ class DabServer():
     program = request.match_info['program']
     logger.debug('get_current_label: channel: %s program: %s', channel, program)
     if program in self.handlers:
-      return web.Response(text=self.handlers[program].label,
+      return web.Response(text=self.handlers[program].data.label,
                           headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
     # no data found
     raise web.HTTPNotFound()

@@ -178,7 +178,8 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
             artist = show_details['subtitle']
           show_end = int(show_details['stop'])
           time_remaining = int(show_end - time.time())
-          self._tvheadend_show_updater = asyncio.create_task(self._handle_mpd_new_song_delayed(song_info, time_remaining + 10))
+          tvh_coro = self._handle_mpd_new_song_delayed(song_info, time_remaining + 10)
+          self._tvheadend_show_updater = asyncio.create_task(tvh_coro)
         else:
           # No EPG data. Show only channel name
           title = tvh_channel.name()
