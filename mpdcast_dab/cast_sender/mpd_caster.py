@@ -17,6 +17,7 @@
 import asyncio
 import time
 import logging
+import dataclasses
 import zeroconf
 import pychromecast
 import mpd.asyncio
@@ -28,6 +29,13 @@ from mpdcast_dab.cast_sender.dabserver_connector import DabserverStation
 
 logger = logging.getLogger(__name__)
 
+
+@dataclasses.dataclass
+class CastData():
+  def __init__(self, title = None, artist = None, image_url = None):
+    self.title     = title
+    self.artist    = artist
+    self.image_url = image_url
 
 class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
                 pychromecast.socket_client.ConnectionStatusListener,
@@ -41,78 +49,86 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   cast_forever returns as soon as the connection to the mpdclient instance is lost
   """
 
+
+  @dataclasses.dataclass
+  class CastStatus():
+    def __init__(self):
+      self.controller   = None
+      self.chromecast   = None
+      self.media_status = None
+
+  @dataclasses.dataclass
+  class UpdateTasks():
+    def __init__(self):
+      self.tvh_show  = None
+      self.dab_label = None
+      self.dab_image = None
+
+  @dataclasses.dataclass
+  class Config():
+    def __init__(self, my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_server):
+      self.image_server      = image_server
+      self.cast_receiver_url = cast_receiver_url
+      self.mpd_port          = mpd_port
+      self.device_name       = device_name
+      self.cast_url          = 'http://' + my_ip + ':' + streaming_port + '/'
+      self.default_image     = 'https://www.musicpd.org/logo.png'
+
+
   def __init__(self, my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_server):
-    self.image_server      = image_server
-    self.cast_receiver_url = cast_receiver_url
-    self.mpd_port          = mpd_port
-    self.device_name       = device_name
-    self.cast_url          = 'http://' + my_ip + ':' + streaming_port + '/'
-    self.default_image = 'https://www.musicpd.org/logo.png'
-    self.mpd_client = mpd.asyncio.MPDClient()
-    self.controller  = None
-    self.chromecast  = None
-    self._tvheadend_show_updater    = None
+    self._config     = self.Config(my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_server)
+    self._updater    = self.UpdateTasks()
+    self._cast       = self.CastStatus()
+    self._mpd_client = mpd.asyncio.MPDClient()
     self._dabserver_current_station = None
-    self._dabserver_label_updater   = None
-    self._dabserver_image_updater   = None
-    self._media_event = asyncio.Event()
-    self._media_status = None
-    self._cast_finder = None
+    self._media_event   = asyncio.Event()
+    self._cast_finder   = None
     self._my_async_loop = None
 
   def waitfor_and_register_device(self):
-    self._cast_finder = CastFinder(self.device_name)
+    self._cast_finder = CastFinder(self._config.device_name)
     self._cast_finder.do_discovery()
     if self._cast_finder.device:
-      self.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast_finder.device, zeroconf.Zeroconf())
+      self._cast.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast_finder.device, zeroconf.Zeroconf())
 
-      self.chromecast.wait()
-      if self.chromecast.app_id != pychromecast.IDLE_APP_ID:
-        self.chromecast.quit_app()
+      self._cast.chromecast.wait()
+      if self._cast.chromecast.app_id != pychromecast.IDLE_APP_ID:
+        self._cast.chromecast.quit_app()
         time.sleep(0.5)
-      self.controller = LocalMediaPlayerController(self.cast_receiver_url, False)
-      self.chromecast.register_handler(self.controller)   # allows Chromecast to use Local Media Player app
-      self.chromecast.register_connection_listener(self)  # await new_connection_status() => re-init from scratch
-      self.controller.register_status_listener(self)      # await new_media_status() / load_media_failed()
-      #self.chromecast.register_status_listener(self)     # await new_cast_status()  => not of interest
+      self._cast.controller = LocalMediaPlayerController(self._config.cast_receiver_url, False)
+      self._cast.chromecast.register_handler(self._cast.controller)  # allows Chromecast to use Local Media Player app
+      self._cast.chromecast.register_connection_listener(self)  # await new_connection_status() => re-init from scratch
+      self._cast.controller.register_status_listener(self)      # await new_media_status() / load_media_failed()
+      #self._cast.chromecast.register_status_listener(self)     # await new_cast_status()  => not of interest
 
     self._cast_finder = None
 
   def new_media_status(self, status):
-    self._media_status = status
+    self._cast.media_status = status
     if status.media_session_id:
       self._my_async_loop.call_soon_threadsafe(self._media_event.set)
 
   def load_media_failed(self, queue_item_id, error_code):
-    self._media_status = error_code
+    self._cast.media_status = error_code
 
   async def _handle_mpd_start_play(self):
-    self.controller.update_local_receiver_path()
+    self._cast.controller.update_local_receiver_path()
 
     args = {}
     args["content_type"] = "audio/mpga"
     args["title"] = "Streaming MPD"
 
     # initiate the cast
-    self.chromecast.wait()
-    self.controller.play_media(self.cast_url, **args)
+    self._cast.chromecast.wait()
+    self._cast.controller.play_media(self._config.cast_url, **args)
     await self._media_event.wait()
     self._media_event.clear()
 
   def _handle_mpd_stop_play(self):
-    if self._tvheadend_show_updater:
-      self._tvheadend_show_updater.cancel()
-      self._tvheadend_show_updater = None
-    if self._dabserver_current_station:
-      self._dabserver_label_updater.cancel()
-      self._dabserver_label_updater = None
-      self._dabserver_image_updater.cancel()
-      self._dabserver_image_updater = None
-      self._dabserver_current_station = None
-
-    if self.chromecast.status.app_id == APP_LOCAL:
-      self.chromecast.wait()
-      self.chromecast.quit_app()
+    self._stop_update_tasks()
+    if self._cast.chromecast.status.app_id == APP_LOCAL:
+      self._cast.chromecast.wait()
+      self._cast.chromecast.quit_app()
 
   async def _handle_mpd_new_song_delayed(self, song_info, delay):
     await asyncio.sleep(delay)
@@ -128,29 +144,23 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       await self._dabserver_current_station.new_image()
       await self._handle_mpd_new_song(song_info, True)
 
+  def _stop_update_tasks(self):
+    if self._updater.tvh_show:
+      self._updater.tvh_show.cancel()
+      self._updater.tvh_show = None
+    if self._dabserver_current_station:
+      self._updater.dab_label.cancel()
+      self._updater.dab_label = None
+      self._updater.dab_image.cancel()
+      self._updater.dab_image = None
+      self._dabserver_current_station = None
+
   async def _handle_mpd_new_song(self, song_info, dynamic_update = False):
     if not dynamic_update:
-      if self._tvheadend_show_updater:
-        self._tvheadend_show_updater.cancel()
-        self._tvheadend_show_updater = None
-      if self._dabserver_current_station:
-        self._dabserver_label_updater.cancel()
-        self._dabserver_label_updater = None
-        self._dabserver_image_updater.cancel()
-        self._dabserver_image_updater = None
-        self._dabserver_current_station = None
+      self._stop_update_tasks()
 
     song_file = song_info['file']
-    image_url = self.default_image
-
-    if 'title' in song_info:
-      title = song_info['title']
-    else:
-      title = None
-    if 'artist' in song_info:
-      artist = song_info['artist']
-    else:
-      artist = None
+    cast_data = CastData(image_url = self._config.default_image)
 
     if song_file.startswith('http'):
       tvh_channel = TvheadendChannel(song_file)
@@ -158,86 +168,72 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
       if self._dabserver_current_station:
         # Label or image update of a DAB station
-        title  = self._dabserver_current_station.station_name
-        artist = self._dabserver_current_station.label
-        image_url = self._dabserver_current_station.image_url
-
+        self._dabserver_current_station.fill_cast_data(cast_data)
       elif await tvh_channel.initialize():
         # new TvHeadend URL or EPG update
-        tvheadend_image_url = await tvh_channel.image_url()
-        if tvheadend_image_url:
-          image_url = tvheadend_image_url
-        else:
-          image_url = 'https://www.radio.de/assets/images/app-stores/square_512x512_playstore.png'
-
-        show_details = await tvh_channel.current_show()
-        if show_details:
-          if 'title' in show_details:
-            title = show_details['title']
-          if 'subtitle' in show_details:
-            artist = show_details['subtitle']
-          show_end = int(show_details['stop'])
-          time_remaining = int(show_end - time.time())
-          tvh_coro = self._handle_mpd_new_song_delayed(song_info, time_remaining + 10)
-          self._tvheadend_show_updater = asyncio.create_task(tvh_coro)
-        else:
-          # No EPG data. Show only channel name
-          title = tvh_channel.name()
-
+        await tvh_channel.fill_cast_data(cast_data)
+        remaining_time = tvh_channel.get_remaining_show_time()
+        if remaining_time:
+          tvh_coro = self._handle_mpd_new_song_delayed(song_info, remaining_time + 10)
+          self._updater.tvh_show = asyncio.create_task(tvh_coro)
       elif await dab_station.initialize():
         logger.info('new DAB station')
         # New DAB station
+        dab_station.fill_cast_data(cast_data)
         self._dabserver_current_station = dab_station
-        title  = self._dabserver_current_station.station_name
-        artist = self._dabserver_current_station.label
-        image_url = self._dabserver_current_station.image_url
         # Create tasks which will update the image and song details
-        self._dabserver_label_updater = asyncio.create_task(self._check_new_dab_label(song_info))
-        self._dabserver_image_updater = asyncio.create_task(self._check_new_dab_image(song_info))
-
+        self._updater.dab_label = asyncio.create_task(self._check_new_dab_label(song_info))
+        self._updater.dab_image = asyncio.create_task(self._check_new_dab_image(song_info))
     else:
+      if 'title' in song_info:
+        cast_data.title = song_info['title']
+      elif 'name' in song_info:
+        cast_data.title = song_info['name']
+      else:
+        cast_data.title = None
+
+      if 'artist' in song_info:
+        cast_data.artist = song_info['artist']
       try:
-        picture_dict = await self.mpd_client.readpicture(song_file)
+        picture_dict = await self._mpd_client.readpicture(song_file)
         if picture_dict:
-          image_url = self.image_server.store_song_picture(song_file, picture_dict)
+          cast_data.image_url = self._config.image_server.store_song_picture(song_file, picture_dict)
       except mpd.base.CommandError as exc:
         logger.exception('Received exception from MPD')
         logger.exception(str(exc))
 
-    if not title and 'name' in song_info:
-      title = song_info['name']
-
-    self.chromecast.wait()
-    logger.info('update details: title: %s artist: %s image_url: %s',  title, artist, image_url)
-    self.controller.set_music_track_media_metadata(title, artist, image_url)
+    self._cast.chromecast.wait()
+    logger.info('update details: title: %s artist: %s image_url: %s',
+		             cast_data.title, cast_data.artist, cast_data.image_url)
+    self._cast.controller.set_music_track_media_metadata(cast_data.title, cast_data.artist, cast_data.image_url)
 
   def new_cast_status(self, status):
-    if self.chromecast:
-      logger.info ("Chromecast Session ID: %s",  str(self.chromecast.status.session_id))
-    if self.controller:
-      logger.info ("Controller Session ID: %s", str(self.controller.status.media_session_id))
+    if self._cast.chromecast:
+      logger.info ("Chromecast Session ID: %s",  str(self._cast.chromecast.status.session_id))
+    if self._cast.controller:
+      logger.info ("Controller Session ID: %s", str(self._cast.controller.status.media_session_id))
     logger.info ("Listener Session ID: %s", str(status.session_id))
 
   def new_connection_status(self, status):
     # Handle when the chromecast device gets shut down or loses network connection
     if status.status == 'LOST':
-      self.controller = None
-      self.chromecast = None
+      self._cast.controller = None
+      self._cast.chromecast = None
 
   async def cast_forever(self):
     self._my_async_loop = asyncio.get_running_loop()
-    await self.mpd_client.connect('localhost', self.mpd_port)
+    await self._mpd_client.connect('localhost', self._config.mpd_port)
 
     processed_mpd_state = ""
     processed_mpd_song  = ""
 
     try:
-      async for _ in self.mpd_client.idle():
-        mpd_client_status = await self.mpd_client.status()
-        current_mpd_state = mpd_client_status["state"]
-        current_mpd_song = await self.mpd_client.currentsong()
+      async for _ in self._mpd_client.idle():
+        _mpd_client_status = await self._mpd_client.status()
+        current_mpd_state = _mpd_client_status["state"]
+        current_mpd_song = await self._mpd_client.currentsong()
 
-        if not self.controller:
+        if not self._cast.controller:
           # Chromecast disappeared from the network or discovery has not yet been executed
           return
 
@@ -262,6 +258,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     if self._cast_finder:
       self._cast_finder.cancel()
     else:
-      self.mpd_client.stop()
-      self.mpd_client.disconnect()
+      self._mpd_client.stop()
+      self._mpd_client.disconnect()
       self._handle_mpd_stop_play()

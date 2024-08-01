@@ -15,6 +15,7 @@
 """This module retrieves stream metadata from TvHeadend."""
 
 import json
+import time
 import logging
 import aiohttp
 import yarl
@@ -33,6 +34,7 @@ class TvheadendChannel():
     self.song_url = yarl.URL(song_urlstring)
     self._initialized = False
     self._channel_data = None
+    self._show_end = None
 
   async def initialize(self):
     logger.info('initializing tvheadend server')
@@ -74,6 +76,33 @@ class TvheadendChannel():
           return True
     # channel was not found
     return False
+
+  async def fill_cast_data(self, cast_data):
+    if not self._initialized:
+      return False
+    tvheadend_image_url = await self.image_url()
+    if tvheadend_image_url:
+      cast_data.image_url = tvheadend_image_url
+    else:
+      cast_data.image_url = 'https://www.radio.de/assets/images/app-stores/square_512x512_playstore.png'
+
+    show_details = await self.current_show()
+    if show_details:
+      if 'title' in show_details:
+        cast_data.title = show_details['title']
+      if 'subtitle' in show_details:
+        cast_data.artist = show_details['subtitle']
+      self._show_end = int(show_details['stop'])
+    else:
+      # No EPG data. Show only channel name
+      cast_data.title = self.name()
+    return True
+
+  def get_remaining_show_time(self):
+    if not self._show_end:
+      return None
+    else:
+      return int(self._show_end - time.time())
 
   def name(self):
     return self._channel_data['name']

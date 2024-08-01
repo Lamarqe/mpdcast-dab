@@ -62,6 +62,15 @@ class DabserverStation():
       logger.info('return false, not 4 items')
       return False
 
+  def fill_cast_data(self, cast_data):
+    if not self._initialized:
+      return False
+    cast_data.title     = self.station_name
+    cast_data.artist    = self.label
+    cast_data.image_url = self.image_url
+    return True
+
+
   async def new_label(self):
     label_path = 'label/next/' + self.channel_name + '/' + self.station_name
     label_url = self.song_url.with_path(label_path)

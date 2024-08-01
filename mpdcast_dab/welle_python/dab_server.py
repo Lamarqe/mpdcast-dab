@@ -185,7 +185,7 @@ class DabServer():
 
       # prepend the wav header to the initial response
       next_audio_frame, audio = await handler.new_audio()
-      header = self.wav_header(False, 2, 16, handler.sample_rate)
+      header = self.wav_header(False, 2, 16, handler.data.sample_rate)
       await response.write(header + audio)
 
       while True:
