@@ -174,7 +174,6 @@ def main():
     # run the webserver in parallel to the cast task
     while True:
       if init_mpdcast_ok:
-        print("STARTING MPD CAST LOOP")
         # wait until we find the cast device in the network
         mpd_caster.waitfor_and_register_castdevice()
         # run the cast (until chromecast or MPD disconnect)

@@ -191,10 +191,12 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
         logger.exception('Received exception from MPD')
         logger.exception(str(exc))
 
-    self._cast.chromecast.wait()
-    logger.info('update details: title: %s artist: %s image_url: %s',
-		             cast_data.title, cast_data.artist, cast_data.image_url)
-    self._cast.controller.set_music_track_media_metadata(cast_data.title, cast_data.artist, cast_data.image_url)
+    if self._cast.chromecast:
+      self._cast.chromecast.wait()
+      logger.info('update details: title: %s artist: %s image_url: %s',
+                  cast_data.title, cast_data.artist, cast_data.image_url)
+      if self._cast.controller:
+        self._cast.controller.set_music_track_media_metadata(cast_data.title, cast_data.artist, cast_data.image_url)
 
   async def _fill_cast_data(self, cast_data, song_info):
     song_file = song_info['file']
@@ -228,28 +230,39 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     if not self._mpd_client.connected:
       await self._mpd_client.connect('localhost', self._config.mpd_port)
 
+    initial_mpd_status = await self._mpd_client.status()
     # avoid spontaneous playback when chromecast becomes available, eg after nightly reboot
+    ignore_current_playback = bool(initial_mpd_status['state'] == 'play')
     cast_is_active      = False
+    processed_mpd_song  = ''
 
     try:
       async for _ in self._mpd_client.idle():
-        _mpd_client_status = await self._mpd_client.status()
-        current_mpd_state = _mpd_client_status['state']
-        current_mpd_song = await self._mpd_client.currentsong()
+        mpd_client_status = await self._mpd_client.status()
+        mpd_is_playing = bool(mpd_client_status['state'] == 'play')
 
         if not self._cast.chromecast:
-          # Chromecast disappeared from the network or discovery has not yet been executed
-          self._handle_mpd_stop_play()
+          # Chromecast disappeared from the network.
+          if cast_is_active:
+            # Disable internal update events
+            self._handle_mpd_stop_play()
           return
 
-        if not cast_is_active and current_mpd_state == 'play':
+        # continue to ignore playback if we ignored until now and MPD is still playing
+        ignore_current_playback = bool(ignore_current_playback and mpd_is_playing)
+        if ignore_current_playback:
+          # Dont process
+          continue
+
+        if not cast_is_active and mpd_is_playing:
           await self._handle_mpd_start_play()
           cast_is_active = True
-        elif cast_is_active and current_mpd_state != 'play':
+        elif cast_is_active and not mpd_is_playing:
           self._handle_mpd_stop_play()
           processed_mpd_song = ''
           cast_is_active = False
 
+        current_mpd_song = await self._mpd_client.currentsong()
         if cast_is_active and current_mpd_song and current_mpd_song != processed_mpd_song:
           logger.info('current_mpd_song: %s', current_mpd_song)
           await self._handle_mpd_new_song(current_mpd_song)
