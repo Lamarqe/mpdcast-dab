@@ -22,6 +22,7 @@ from zeroconf import Zeroconf
 import pychromecast
 import mpd.asyncio
 
+from mpdcast_dab.cast_sender.imageserver import ImageRequestHandler
 from mpdcast_dab.cast_sender.local_media_player import LocalMediaPlayerController, APP_LOCAL
 from mpdcast_dab.cast_sender.cast_finder import CastFinder
 from mpdcast_dab.cast_sender.tvheadend_connector import TvheadendChannel
@@ -56,6 +57,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self.controller   = None
       self.chromecast   = None
       self.media_status = None
+      self.media_event = asyncio.Event()
 
   @dataclasses.dataclass
   class UpdateTasks():
@@ -66,8 +68,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
   @dataclasses.dataclass
   class Config():
-    def __init__(self, cast_url, cast_receiver_url, mpd_port, device_name, image_server):
-      self.image_server      = image_server
+    def __init__(self, cast_url, cast_receiver_url, mpd_port, device_name):
       self.cast_receiver_url = cast_receiver_url
       self.mpd_port          = mpd_port
       self.device_name       = device_name
@@ -75,13 +76,13 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self.default_image     = 'https://www.musicpd.org/logo.png'
 
 
-  def __init__(self, cast_url, cast_receiver_url, mpd_port, device_name, image_server):
-    self._config     = self.Config(cast_url, cast_receiver_url, mpd_port, device_name, image_server)
+  def __init__(self, cast_url, cast_receiver_url, mpd_port, device_name):
+    self._config     = self.Config(cast_url, cast_receiver_url, mpd_port, device_name)
     self._updater    = self.UpdateTasks()
     self._cast       = self.CastStatus()
+    self._image_server = ImageRequestHandler(cast_receiver_url.host, cast_receiver_url.port)
     self._mpd_client = mpd.asyncio.MPDClient()
     self._dabserver_current_station = None
-    self._media_event   = asyncio.Event()
     self._cast_finder   = None
 
   def waitfor_and_register_castdevice(self):
@@ -95,7 +96,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
         if self._cast.chromecast.app_id != pychromecast.IDLE_APP_ID:
           self._cast.chromecast.quit_app()
           time.sleep(0.5)
-        self._cast.controller = LocalMediaPlayerController(self._config.cast_receiver_url, False)
+        self._cast.controller = LocalMediaPlayerController(str(self._config.cast_receiver_url), False)
         self._cast.chromecast.register_handler(self._cast.controller)  # allows Chromecast to use Local Media Player app
         self._cast.chromecast.register_connection_listener(self)  # await new_connection_status() => re-initialize
         self._cast.controller.register_status_listener(self)      # await new_media_status() / load_media_failed()
@@ -106,7 +107,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   def new_media_status(self, status):
     self._cast.media_status = status
     if status.media_session_id:
-      self._media_event.set()
+      self._cast.media_event.set()
 
   def load_media_failed(self, queue_item_id, error_code):
     self._cast.media_status = error_code
@@ -120,9 +121,9 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
     # initiate the cast
     self._cast.chromecast.wait()
-    self._cast.controller.play_media(self._config.cast_url, **args)
-    await self._media_event.wait()
-    self._media_event.clear()
+    self._cast.controller.play_media(str(self._config.cast_url), **args)
+    await self._cast.media_event.wait()
+    self._cast.media_event.clear()
 
   def _handle_mpd_stop_play(self):
     self._stop_update_tasks()
@@ -211,7 +212,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       cast_data.artist = song_info['artist']
       picture_dict = await self._mpd_client.readpicture(song_file)
       if picture_dict:
-        cast_data.image_url = self._config.image_server.store_song_picture(song_file, picture_dict)
+        cast_data.image_url = self._image_server.store_song_picture(song_file, picture_dict)
 
   def new_cast_status(self, status):
     if self._cast.chromecast:
@@ -278,3 +279,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self._mpd_client.stop()
       self._mpd_client.disconnect()
       self._handle_mpd_stop_play()
+
+  def get_routes(self):
+    return self._image_server.get_routes()

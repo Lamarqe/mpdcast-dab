@@ -25,9 +25,9 @@ import re
 import tomllib
 import ifaddr
 from aiohttp import web
+from yarl import URL
 
 from mpdcast_dab.cast_sender.output_grabber import OutputGrabber
-from mpdcast_dab.cast_sender.imageserver import ImageRequestHandler
 from mpdcast_dab.cast_sender.mpd_caster import MpdCaster
 from mpdcast_dab.welle_python.dab_server import DabServer
 
@@ -150,11 +150,10 @@ def main():
 
   if init_mpdcast_ok:
     web_app.add_routes([web.get(r'', get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
-    image_request_handler = ImageRequestHandler(my_ip, WEB_PORT)
-    web_app.add_routes(image_request_handler.get_routes())
-    cast_receiver_url = 'http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE
-    mpd_stream_url    = 'http://' + my_ip + ':' + streaming_port + '/'
-    mpd_caster = MpdCaster(mpd_stream_url, cast_receiver_url, mpd_port, device_name, image_request_handler)
+    cast_receiver_url = URL('http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE)
+    mpd_stream_url    = URL('http://' + my_ip + ':' + streaming_port + '/')
+    mpd_caster = MpdCaster(mpd_stream_url, cast_receiver_url, mpd_port, device_name)
+    web_app.add_routes(mpd_caster.get_routes())
 
   if init_dab_ok:
     web_app.add_routes(dab_server.get_routes())
