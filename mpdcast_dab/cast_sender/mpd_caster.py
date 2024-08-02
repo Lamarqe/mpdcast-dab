@@ -66,17 +66,17 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
   @dataclasses.dataclass
   class Config():
-    def __init__(self, my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_server):
+    def __init__(self, cast_url, cast_receiver_url, mpd_port, device_name, image_server):
       self.image_server      = image_server
       self.cast_receiver_url = cast_receiver_url
       self.mpd_port          = mpd_port
       self.device_name       = device_name
-      self.cast_url          = 'http://' + my_ip + ':' + streaming_port + '/'
+      self.cast_url          = cast_url
       self.default_image     = 'https://www.musicpd.org/logo.png'
 
 
-  def __init__(self, my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_server):
-    self._config     = self.Config(my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_server)
+  def __init__(self, cast_url, cast_receiver_url, mpd_port, device_name, image_server):
+    self._config     = self.Config(cast_url, cast_receiver_url, mpd_port, device_name, image_server)
     self._updater    = self.UpdateTasks()
     self._cast       = self.CastStatus()
     self._mpd_client = mpd.asyncio.MPDClient()

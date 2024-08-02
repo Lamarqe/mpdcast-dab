@@ -127,7 +127,6 @@ def main():
     # Set up fallback that can be used for DAB playlist creation
     my_ip = '127.0.0.1'
 
-  cast_receiver_url = 'http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE
   try:
     mpd_config = load_mpd_config(args['conf'])
     mpd_port, device_name, streaming_port = read_mpd_config(mpd_config)
@@ -172,8 +171,10 @@ def main():
     # run the webserver in parallel to the cast task
     while True:
       if init_mpdcast_ok:
+        cast_receiver_url = 'http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE
+        mpd_stream_url    = 'http://' + my_ip + ':' + streaming_port + '/'
+        mpd_caster = MpdCaster(mpd_stream_url, cast_receiver_url, mpd_port, device_name, image_request_handler)
         # wait until we find the cast device in the network
-        mpd_caster = MpdCaster(my_ip, cast_receiver_url, mpd_port, device_name, streaming_port, image_request_handler)
         mpd_caster.waitfor_and_register_device()
         # run the cast (until chromecast disconnects)
         loop.run_until_complete(mpd_caster.cast_forever())
