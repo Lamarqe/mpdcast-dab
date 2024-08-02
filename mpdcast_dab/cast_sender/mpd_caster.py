@@ -83,7 +83,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self._dabserver_current_station = None
     self._media_event   = asyncio.Event()
     self._cast_finder   = None
-    self._my_async_loop = None
 
   def waitfor_and_register_device(self):
     self._cast_finder = CastFinder(self._config.device_name)
@@ -106,7 +105,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   def new_media_status(self, status):
     self._cast.media_status = status
     if status.media_session_id:
-      self._my_async_loop.call_soon_threadsafe(self._media_event.set)
+      self._media_event.set()
 
   def load_media_failed(self, queue_item_id, error_code):
     self._cast.media_status = error_code
@@ -225,7 +224,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self._cast.chromecast = None
 
   async def cast_forever(self):
-    self._my_async_loop = asyncio.get_running_loop()
     await self._mpd_client.connect('localhost', self._config.mpd_port)
 
     processed_mpd_state = ""
