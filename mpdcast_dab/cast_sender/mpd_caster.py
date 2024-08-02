@@ -18,7 +18,7 @@ import asyncio
 import time
 import logging
 import dataclasses
-import zeroconf
+from zeroconf import Zeroconf
 import pychromecast
 import mpd.asyncio
 
@@ -84,23 +84,24 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self._media_event   = asyncio.Event()
     self._cast_finder   = None
 
-  def waitfor_and_register_device(self):
-    self._cast_finder = CastFinder(self._config.device_name)
-    self._cast_finder.do_discovery()
-    if self._cast_finder.device:
-      self._cast.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast_finder.device, zeroconf.Zeroconf())
+  def waitfor_and_register_castdevice(self):
+    if not self._cast.chromecast:
+      self._cast_finder = CastFinder(self._config.device_name)
+      self._cast_finder.do_discovery()
+      if self._cast_finder.device:
+        self._cast.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast_finder.device, Zeroconf())
 
-      self._cast.chromecast.wait()
-      if self._cast.chromecast.app_id != pychromecast.IDLE_APP_ID:
-        self._cast.chromecast.quit_app()
-        time.sleep(0.5)
-      self._cast.controller = LocalMediaPlayerController(self._config.cast_receiver_url, False)
-      self._cast.chromecast.register_handler(self._cast.controller)  # allows Chromecast to use Local Media Player app
-      self._cast.chromecast.register_connection_listener(self)  # await new_connection_status() => re-init from scratch
-      self._cast.controller.register_status_listener(self)      # await new_media_status() / load_media_failed()
-      #self._cast.chromecast.register_status_listener(self)     # await new_cast_status()  => not of interest
+        self._cast.chromecast.wait()
+        if self._cast.chromecast.app_id != pychromecast.IDLE_APP_ID:
+          self._cast.chromecast.quit_app()
+          time.sleep(0.5)
+        self._cast.controller = LocalMediaPlayerController(self._config.cast_receiver_url, False)
+        self._cast.chromecast.register_handler(self._cast.controller)  # allows Chromecast to use Local Media Player app
+        self._cast.chromecast.register_connection_listener(self)  # await new_connection_status() => re-initialize
+        self._cast.controller.register_status_listener(self)      # await new_media_status() / load_media_failed()
+        #self._cast.chromecast.register_status_listener(self)     # await new_cast_status()  => not of interest
 
-    self._cast_finder = None
+      self._cast_finder = None
 
   def new_media_status(self, status):
     self._cast.media_status = status
@@ -125,7 +126,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
   def _handle_mpd_stop_play(self):
     self._stop_update_tasks()
-    if self._cast.chromecast.status.app_id == APP_LOCAL:
+    if self._cast.chromecast and self._cast.chromecast.status.app_id == APP_LOCAL:
       self._cast.chromecast.wait()
       self._cast.chromecast.quit_app()
 
@@ -223,38 +224,39 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self._cast.controller = None
       self._cast.chromecast = None
 
-  async def cast_forever(self):
-    await self._mpd_client.connect('localhost', self._config.mpd_port)
+  async def cast_until_connection_lost(self):
+    if not self._mpd_client.connected:
+      await self._mpd_client.connect('localhost', self._config.mpd_port)
 
-    processed_mpd_state = ""
-    processed_mpd_song  = ""
+    # avoid spontaneous playback when chromecast becomes available, eg after nightly reboot
+    cast_is_active      = False
 
     try:
       async for _ in self._mpd_client.idle():
         _mpd_client_status = await self._mpd_client.status()
-        current_mpd_state = _mpd_client_status["state"]
+        current_mpd_state = _mpd_client_status['state']
         current_mpd_song = await self._mpd_client.currentsong()
 
-        if not self._cast.controller:
+        if not self._cast.chromecast:
           # Chromecast disappeared from the network or discovery has not yet been executed
+          self._handle_mpd_stop_play()
           return
 
-        if current_mpd_state != processed_mpd_state:
-          match current_mpd_state:
-            case "play":
-              await self._handle_mpd_start_play()
-            case "stop" | "pause":
-              self._handle_mpd_stop_play()
-              processed_mpd_song = ""
-          processed_mpd_state = current_mpd_state
+        if not cast_is_active and current_mpd_state == 'play':
+          await self._handle_mpd_start_play()
+          cast_is_active = True
+        elif cast_is_active and current_mpd_state != 'play':
+          self._handle_mpd_stop_play()
+          processed_mpd_song = ''
+          cast_is_active = False
 
-        if current_mpd_song != processed_mpd_song:
+        if cast_is_active and current_mpd_song and current_mpd_song != processed_mpd_song:
           logger.info('current_mpd_song: %s', current_mpd_song)
-          if current_mpd_song and current_mpd_state == "play":
-            await self._handle_mpd_new_song(current_mpd_song)
-            processed_mpd_song = current_mpd_song
+          await self._handle_mpd_new_song(current_mpd_song)
+          processed_mpd_song = current_mpd_song
     except mpd.base.ConnectionError:
-      return
+      # Connection to MPD lost
+      self._handle_mpd_stop_play()
 
   async def stop(self):
     if self._cast_finder:
