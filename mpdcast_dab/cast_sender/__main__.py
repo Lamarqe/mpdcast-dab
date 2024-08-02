@@ -37,6 +37,64 @@ CAST_PATH = '/cast_receiver'
 CAST_PAGE = 'receiver.html'
 WEB_PORT = 8080
 
+class RedirectedStreams():
+  def __init__(self):
+    self._stdout_grabber = OutputGrabber(sys.stdout, 'Welle.io', logging.Logger.error)
+    self._stderr_grabber = OutputGrabber(sys.stderr, 'Welle.io', logging.Logger.warning)
+
+  def redirect_out_streams(self):
+    sys.stdout = self._stdout_grabber.redirect_stream()
+    sys.stderr = self._stderr_grabber.redirect_stream()
+
+  def restore_out_streams(self):
+    self._stdout_grabber.cleanup()
+    self._stderr_grabber.cleanup()
+
+class MpdConfig():
+  def __init__(self, filename):
+    self._filename = filename
+    self._config   = None
+    self.port           = None
+    self.streaming_port = None
+    self.device_name    = None
+
+  def initialize(self):
+    self.load()
+    self.read()
+
+  def load(self):
+    logger.info('Loading config from %s', self._filename)
+    with open(self._filename, 'r', encoding='utf-8') as cfg_file:
+      config_string = cfg_file.read()
+      # convert curly brace groups to toml arrays
+      config_string = re.sub(r"\n([^\s#]*?)\s*{(.*?)}", r"\n[[\1]]\2\n", config_string, flags=re.S, count=0)
+      # separate key and value with equals sign
+      config_string = re.sub(r"^\s*(\w+)\s*(.*)$", r"\1 = \2", config_string, flags=re.M, count=0)
+      # now the config should adhere to toml spec.
+      self._config = tomllib.loads(config_string)
+
+  def read(self):
+    self.port = int(self._config.get("port", "6600"))
+
+    httpd_defined  = False
+    if "audio_output" in self._config:
+      for audio_output in self._config["audio_output"]:
+        if 'type' in audio_output and audio_output['type'] == 'httpd':
+          httpd_defined = True
+          if 'port' in audio_output:
+            self.streaming_port = audio_output['port']
+          if 'name' in audio_output:
+            self.device_name = audio_output['name']
+
+    if not httpd_defined:
+      raise SyntaxError('No httpd audio output defined.')
+    if not self.streaming_port:
+      raise SyntaxError('No httpd streaming port defined.')
+    if not self.streaming_port.isdigit():
+      raise SyntaxError('Invalid http streaming port defined: ' + self.streaming_port + '.')
+    if not self.device_name:
+      raise SyntaxError('No cast device name defined')
+
 def get_first_ipv4_address():
   for iface in ifaddr.get_adapters():
     for addr in iface.ips:
@@ -45,44 +103,6 @@ def get_first_ipv4_address():
         if not (addr.ip.startswith('169.254.') or addr.ip == '127.0.0.1'):
           return addr.ip
   return None
-
-def load_mpd_config(config_filename):
-  logger.info('Loading config from %s', config_filename)
-  with open(config_filename, 'r', encoding='utf-8') as cfg_file:
-    config_string = cfg_file.read()
-    # convert curly brace groups to toml arrays
-    config_string = re.sub(r"\n([^\s#]*?)\s*{(.*?)}", r"\n[[\1]]\2\n", config_string, flags=re.S, count=0)
-    # separate key and value with equals sign
-    config_string = re.sub(r"^\s*(\w+)\s*(.*)$", r"\1 = \2", config_string, flags=re.M, count=0)
-    # now the config should adhere to toml spec.
-    mpd_config = tomllib.loads(config_string)
-  return mpd_config
-
-def read_mpd_config(config):
-  mpd_port = int(config.get("port", "6600"))
-
-  httpd_defined  = False
-  streaming_port = None
-  device_name    = None
-  if "audio_output" in config:
-    for audio_output in config["audio_output"]:
-      if 'type' in audio_output and audio_output['type'] == 'httpd':
-        httpd_defined = True
-        if 'port' in audio_output:
-          streaming_port = audio_output['port']
-        if 'name' in audio_output:
-          device_name = audio_output['name']
-
-  if not httpd_defined:
-    raise SyntaxError('No httpd audio output defined.')
-  if not streaming_port:
-    raise SyntaxError('No httpd streaming port defined.')
-  if not streaming_port.isdigit():
-    raise SyntaxError('Invalid http streaming port defined: ' + streaming_port + '.')
-  if not device_name:
-    raise SyntaxError('No cast device name defined')
-
-  return mpd_port, device_name, streaming_port
 
 async def setup_webserver(runner, port):
   await runner.setup()
@@ -104,16 +124,16 @@ def update_logger_config(verbose):
 async def get_webui(request):
   return web.FileResponse('/usr/share/mpdcast-dab/webui/index.htm')
 
-def main():
+def get_args():
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent')
   parser.add_argument('--verbose', help = 'Enable verbose output', action = 'store_true')
   parser.add_argument('--conf', help = 'mpd config file to use. Default: /etc/mpd.conf', default = '/etc/mpd.conf')
-  args = vars(parser.parse_args())
+  return vars(parser.parse_args())
 
-  stdout_grabber = OutputGrabber(sys.stdout, 'Welle.io', logging.Logger.error)
-  stderr_grabber = OutputGrabber(sys.stderr, 'Welle.io', logging.Logger.warning)
-  sys.stdout = stdout_grabber.redirect_stream()
-  sys.stderr = stderr_grabber.redirect_stream()
+def main():
+  args = get_args()
+  redirectors = RedirectedStreams()
+  redirectors.redirect_out_streams()
   update_logger_config(args['verbose'])
 
   # Initialize some status vars
@@ -128,8 +148,8 @@ def main():
     my_ip = '127.0.0.1'
 
   try:
-    mpd_config = load_mpd_config(args['conf'])
-    mpd_port, device_name, streaming_port = read_mpd_config(mpd_config)
+    mpd_config = MpdConfig(args['conf'])
+    mpd_config.initialize()
   except (FileNotFoundError, SyntaxError) as error:
     logger.warning('Failed to read MPD Cast configuration. Disabling.')
     logger.warning(str(error))
@@ -142,17 +162,16 @@ def main():
 
   if not init_mpdcast_ok and not init_dab_ok:
     logger.error('Fatal. Both MpdCast and DAB processing failed to initialize. Exiting.')
-    stdout_grabber.cleanup()
-    stderr_grabber.cleanup()
+    redirectors.restore_out_streams()
     sys.exit(1)
 
   web_app = web.Application()
 
   if init_mpdcast_ok:
+    mpd_caster = MpdCaster(URL('http://' + my_ip + ':' + mpd_config.streaming_port + '/'),
+                           URL('http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE),
+													 mpd_config.port, mpd_config.device_name)
     web_app.add_routes([web.get(r'', get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
-    cast_receiver_url = URL('http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE)
-    mpd_stream_url    = URL('http://' + my_ip + ':' + streaming_port + '/')
-    mpd_caster = MpdCaster(mpd_stream_url, cast_receiver_url, mpd_port, device_name)
     web_app.add_routes(mpd_caster.get_routes())
 
   if init_dab_ok:
@@ -165,8 +184,7 @@ def main():
   except Exception as ex:
     logger.error('Fatal. Could set up web server. Exiting')
     logger.error(str(ex))
-    stdout_grabber.cleanup()
-    stderr_grabber.cleanup()
+    redirectors.restore_out_streams()
     sys.exit(1)
 
   try:
@@ -187,8 +205,7 @@ def main():
     if init_dab_ok:
       loop.run_until_complete(dab_server.stop())
     loop.run_until_complete(runner.cleanup())
-    stdout_grabber.cleanup()
-    stderr_grabber.cleanup()
+    redirectors.restore_out_streams()
 
 if __name__ == '__main__':
   main()
