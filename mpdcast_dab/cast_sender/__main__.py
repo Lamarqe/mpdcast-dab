@@ -52,15 +52,21 @@ class RedirectedStreams():
 
 class MpdConfig():
   def __init__(self, filename):
-    self._filename = filename
-    self._config   = None
+    self._filename      = filename
+    self._config        = None
     self.port           = None
     self.streaming_port = None
     self.device_name    = None
+    self.init_okay      = False
 
   def initialize(self):
-    self.load()
-    self.read()
+    try:
+      self.load()
+      self.read()
+      self.init_okay = True
+    except (FileNotFoundError, SyntaxError) as error:
+      logger.warning('Failed to read MPD Cast configuration. Disabling.')
+      logger.warning(str(error))
 
   def load(self):
     logger.info('Loading config from %s', self._filename)
@@ -136,45 +142,33 @@ def main():
   redirectors.redirect_out_streams()
   update_logger_config(args['verbose'])
 
-  # Initialize some status vars
-  init_mpdcast_ok = True
-  init_dab_ok     = True
-
   my_ip = get_first_ipv4_address()
-  if not my_ip:
+  mpd_config = MpdConfig(args['conf'])
+
+  if my_ip:
+    mpd_config.initialize()
+  else:
     logger.warning('Could not retrieve local IP address')
-    init_mpdcast_ok = False
     # Set up fallback that can be used for DAB playlist creation
     my_ip = '127.0.0.1'
 
-  try:
-    mpd_config = MpdConfig(args['conf'])
-    mpd_config.initialize()
-  except (FileNotFoundError, SyntaxError) as error:
-    logger.warning('Failed to read MPD Cast configuration. Disabling.')
-    logger.warning(str(error))
-    init_mpdcast_ok = False
-
   dab_server = DabServer(my_ip, WEB_PORT)
-  if dab_server.radio_controller is None:
-    logger.warning('No DAB device available')
-    init_dab_ok = False
 
-  if not init_mpdcast_ok and not init_dab_ok:
+  if not mpd_config.init_okay and not dab_server.init_okay:
     logger.error('Fatal. Both MpdCast and DAB processing failed to initialize. Exiting.')
     redirectors.restore_out_streams()
     sys.exit(1)
 
   web_app = web.Application()
 
-  if init_mpdcast_ok:
+  if mpd_config.init_okay:
     mpd_caster = MpdCaster(URL('http://' + my_ip + ':' + mpd_config.streaming_port + '/'),
                            URL('http://' + my_ip + ':' + str(WEB_PORT) + CAST_PATH + '/' + CAST_PAGE),
 													 mpd_config.port, mpd_config.device_name)
     web_app.add_routes([web.get(r'', get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
     web_app.add_routes(mpd_caster.get_routes())
 
-  if init_dab_ok:
+  if dab_server.init_okay:
     web_app.add_routes(dab_server.get_routes())
 
   runner = web.AppRunner(web_app)
@@ -182,7 +176,7 @@ def main():
     loop = asyncio.get_event_loop()
     loop.run_until_complete(setup_webserver(runner, WEB_PORT))
   except Exception as ex:
-    logger.error('Fatal. Could set up web server. Exiting')
+    logger.error('Fatal. Could not set up web server. Exiting')
     logger.error(str(ex))
     redirectors.restore_out_streams()
     sys.exit(1)
@@ -190,7 +184,7 @@ def main():
   try:
     # run the webserver in parallel to the cast task
     while True:
-      if init_mpdcast_ok:
+      if mpd_config.init_okay:
         # wait until we find the cast device in the network
         mpd_caster.waitfor_and_register_castdevice()
         # run the cast (until chromecast or MPD disconnect)
@@ -200,9 +194,9 @@ def main():
         loop.run_until_complete(asyncio.sleep(3600))
 
   except KeyboardInterrupt:
-    if init_mpdcast_ok:
+    if mpd_config.init_okay:
       loop.run_until_complete(mpd_caster.stop())
-    if init_dab_ok:
+    if dab_server.init_okay:
       loop.run_until_complete(dab_server.stop())
     loop.run_until_complete(runner.cleanup())
     redirectors.restore_out_streams()

@@ -35,9 +35,12 @@ class DabServer():
     if device.is_usable():
       self.radio_controller = RadioController(device)
       self.scanner = DabScanner(device)
+      self.init_okay = True
     else:
+      logger.warning('No DAB device available')
       self.radio_controller = None
       self.scanner = None
+      self.init_okay = False
 
     self.handlers = {}
     self._shutdown_in_progress = False
