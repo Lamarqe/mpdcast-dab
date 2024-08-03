@@ -79,43 +79,51 @@ def get_args():
   parser.add_argument('--verbose', help = 'Enable verbose output', action = 'store_true')
   return vars(parser.parse_args())
 
+
+def prepare_cast(options, my_ip, web_app):
+  mpd_caster = MpdCaster(options['conf'], my_ip, WEB_PORT)
+  if not options['disable_mpdcast']:
+    mpd_caster.initialize()
+  if not mpd_caster.init_okay():
+    return None
+  web_app.add_routes(mpd_caster.get_routes())
+  return mpd_caster
+
+def prepare_dab(options, my_ip, web_app):
+  dab_server = DabServer(my_ip, WEB_PORT)
+  if not options['disable_dabserver']:
+    dab_server.initialize()
+  if not dab_server.init_okay:
+    return None
+  web_app.add_routes(dab_server.get_routes())
+  return dab_server
+
 def main():
-  args = get_args()
+  options = get_args()
   redirectors = RedirectedStreams()
   redirectors.redirect_out_streams()
-  update_logger_config(args['verbose'])
+  update_logger_config(options['verbose'])
 
   my_ip = get_first_ipv4_address()
 
   if not my_ip:
     logger.warning('Could not retrieve local IP address')
     # Disable Cast processing as it does not work without knowing the IP
-    args['disable_mpdcast'] = True
+    options['disable_mpdcast'] = True
     # Set up fallback that can be used for DAB playlist creation
     my_ip = '127.0.0.1'
 
   loop = asyncio.new_event_loop()
   asyncio.set_event_loop(loop)
+  web_app = web.Application()
 
-  mpd_caster = MpdCaster(args['conf'], my_ip, WEB_PORT)
-  dab_server = DabServer(my_ip, WEB_PORT)
+  mpd_caster = prepare_cast(options, my_ip, web_app)
+  dab_server = prepare_dab (options, my_ip, web_app)
 
-  if not args['disable_mpdcast']:
-    mpd_caster.initialize()
-  if not args['disable_dabserver']:
-    dab_server.initialize()
-
-  if not mpd_caster.init_okay() and not dab_server.init_okay:
+  if not mpd_caster and not dab_server:
     logger.error('Fatal. Both MpdCast and DAB processing failed to initialize. Exiting.')
     redirectors.restore_out_streams()
     sys.exit(1)
-
-  web_app = web.Application()
-  if mpd_caster.init_okay():
-    web_app.add_routes(mpd_caster.get_routes())
-
-  if dab_server.init_okay:
-    web_app.add_routes(dab_server.get_routes())
 
   runner = web.AppRunner(web_app)
   try:
@@ -129,7 +137,7 @@ def main():
   try:
     # run the webserver in parallel to the cast task
     while True:
-      if mpd_caster.init_okay():
+      if mpd_caster:
         # wait until we find the cast device in the network
         mpd_caster.waitfor_and_register_castdevice()
         # run the cast (until chromecast or MPD disconnect)
@@ -139,9 +147,9 @@ def main():
         loop.run_until_complete(asyncio.sleep(3600))
 
   except KeyboardInterrupt:
-    if mpd_caster.init_okay():
+    if mpd_caster:
       loop.run_until_complete(mpd_caster.stop())
-    if dab_server.init_okay:
+    if dab_server:
       loop.run_until_complete(dab_server.stop())
     loop.run_until_complete(runner.cleanup())
     redirectors.restore_out_streams()
