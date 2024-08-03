@@ -132,14 +132,14 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   def __init__(self, config_filename, my_ip, port):
     self.cast_receiver_url = URL.build(scheme = 'http', host = my_ip, port = port, path = CAST_PATH + '/' + CAST_PAGE)
     self._mpd_config   = MpdConfig(config_filename)
-    if not my_ip:
-      return
-    self._mpd_config.initialize()
     self._updater      = self.UpdateTasks()
     self._cast         = self.CastStatus()
     self._image_server = ImageRequestHandler(my_ip, port)
     self._mpd_client   = mpd.asyncio.MPDClient()
     self._dabserver_current_station = None
+
+  def initialize(self):
+    self._mpd_config.initialize()
 
   def waitfor_and_register_castdevice(self):
     if not self._cast.chromecast:
@@ -339,10 +339,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
   def get_routes(self):
     return (self._image_server.get_routes()
-		     + [web.get(r'', self.get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
-
-  async def get_webui(self, request):
-    return web.FileResponse('/usr/share/mpdcast-dab/webui/index.htm')
+		     + [web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
 
   def init_okay(self):
     return self._mpd_config.init_okay

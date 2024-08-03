@@ -31,6 +31,13 @@ class DabServer():
   def __init__(self, my_ip, port):
     self.my_ip = my_ip
     self.port = port
+    self.radio_controller = None
+    self.scanner = None
+    self.init_okay = False
+    self.handlers = {}
+    self._shutdown_in_progress = False
+
+  def initialize(self):
     device = DabDevice('auto')
     if device.is_usable():
       self.radio_controller = RadioController(device)
@@ -38,15 +45,10 @@ class DabServer():
       self.init_okay = True
     else:
       logger.warning('No DAB device available. DAB server will be disabled.')
-      self.radio_controller = None
-      self.scanner = None
-      self.init_okay = False
-
-    self.handlers = {}
-    self._shutdown_in_progress = False
 
   def get_routes(self):
-    return [web.get('/DAB.m3u8', self.get_scanner_playlist),
+    return [web.get(r'', self.get_webui),
+            web.get('/DAB.m3u8', self.get_scanner_playlist),
             web.get('/get_scanner_details', self.get_scanner_details),
             web.post('/start_scan', self.start_scan),
             web.post('/stop_scan', self.stop_scan),
@@ -208,3 +210,6 @@ class DabServer():
 
     # Make sure above that this line remains unreachable
     raise web.HTTPInternalServerError()
+
+  async def get_webui(self, request):
+    return web.FileResponse('/usr/share/mpdcast-dab/webui/index.htm')

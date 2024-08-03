@@ -73,8 +73,10 @@ def update_logger_config(verbose):
 
 def get_args():
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent')
-  parser.add_argument('--verbose', help = 'Enable verbose output', action = 'store_true')
   parser.add_argument('--conf', help = 'mpd config file to use. Default: /etc/mpd.conf', default = '/etc/mpd.conf')
+  parser.add_argument('--disable-dabserver', help = 'Disable DAB server functionality', action = 'store_true')
+  parser.add_argument('--disable-mpdcast', help = 'Disable MPD Cast functionality', action = 'store_true')
+  parser.add_argument('--verbose', help = 'Enable verbose output', action = 'store_true')
   return vars(parser.parse_args())
 
 def main():
@@ -84,14 +86,24 @@ def main():
   update_logger_config(args['verbose'])
 
   my_ip = get_first_ipv4_address()
-  mpd_caster = MpdCaster(args['conf'], my_ip, WEB_PORT)
 
   if not my_ip:
     logger.warning('Could not retrieve local IP address')
+    # Disable Cast processing as it does not work without knowing the IP
+    args['disable_mpdcast'] = True
     # Set up fallback that can be used for DAB playlist creation
     my_ip = '127.0.0.1'
 
+  loop = asyncio.new_event_loop()
+  asyncio.set_event_loop(loop)
+
+  mpd_caster = MpdCaster(args['conf'], my_ip, WEB_PORT)
   dab_server = DabServer(my_ip, WEB_PORT)
+
+  if not args['disable_mpdcast']:
+    mpd_caster.initialize()
+  if not args['disable_dabserver']:
+    dab_server.initialize()
 
   if not mpd_caster.init_okay() and not dab_server.init_okay:
     logger.error('Fatal. Both MpdCast and DAB processing failed to initialize. Exiting.')
@@ -99,7 +111,6 @@ def main():
     sys.exit(1)
 
   web_app = web.Application()
-
   if mpd_caster.init_okay():
     web_app.add_routes(mpd_caster.get_routes())
 
@@ -108,9 +119,8 @@ def main():
 
   runner = web.AppRunner(web_app)
   try:
-    loop = asyncio.get_event_loop()
     loop.run_until_complete(setup_webserver(runner, WEB_PORT))
-  except (OSError, KeyboardInterrupt, asyncio.exceptions.CancelledError) as ex:
+  except OSError as ex:
     logger.error('Fatal. Could not set up web server. Exiting')
     logger.error(str(ex))
     redirectors.restore_out_streams()
