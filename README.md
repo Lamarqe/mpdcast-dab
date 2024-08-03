@@ -110,5 +110,5 @@ cp build/libwelle_py.so mpdcast_dab/welle_python
 5. Run MpdCast DAB and enjoy it
 
 ```
-sudo ./mpdcast_dab/cast_sender/__main__.py
+sudo ./mpdcast_dab/__main__.py
 ```

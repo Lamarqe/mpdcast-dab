@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class CallbackForwarder():
   # This class forwards all c-lib callbacks to the actual Interface object
   # Making this indirect has two reasons:
-	# 1: It allows dynamic controller objects in python without having to re-initialize the device in C
+  # 1: It allows dynamic controller objects in python without having to re-initialize the device in C
   # 2: The indirection includes a thread handover into async which is required anyways
 
   def __init__(self, target = None):
