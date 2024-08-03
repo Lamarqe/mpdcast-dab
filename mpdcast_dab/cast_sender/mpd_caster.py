@@ -16,9 +16,13 @@
 
 import asyncio
 import time
+import re
 import logging
 import dataclasses
+import tomllib
 from zeroconf import Zeroconf
+from aiohttp import web
+from yarl import URL
 import pychromecast
 import mpd.asyncio
 
@@ -29,6 +33,64 @@ from mpdcast_dab.cast_sender.tvheadend_connector import TvheadendChannel
 from mpdcast_dab.cast_sender.dabserver_connector import DabserverStation
 
 logger = logging.getLogger(__name__)
+
+CAST_PATH     = '/cast_receiver'
+CAST_PAGE     = 'receiver.html'
+DEFAULT_IMAGE = 'https://www.musicpd.org/logo.png'
+
+class MpdConfig():
+  def __init__(self, filename):
+    self._filename      = filename
+    self._config        = None
+    self.port           = None
+    self.streaming_port = None
+    self.device_name    = None
+    self.init_okay      = False
+
+  def cast_url(self):
+    return URL.build(scheme = 'http', host = 'dummy', port = self.streaming_port)
+
+  def initialize(self):
+    try:
+      self.load()
+      self.read()
+      self.init_okay = True
+    except (FileNotFoundError, SyntaxError) as error:
+      logger.warning('Failed to read MPD Cast configuration. Disabling.')
+      logger.warning(str(error))
+
+  def load(self):
+    logger.info('Loading config from %s', self._filename)
+    with open(self._filename, 'r', encoding='utf-8') as cfg_file:
+      config_string = cfg_file.read()
+      # convert curly brace groups to toml arrays
+      config_string = re.sub(r"\n([^\s#]*?)\s*{(.*?)}", r"\n[[\1]]\2\n", config_string, flags=re.S, count=0)
+      # separate key and value with equals sign
+      config_string = re.sub(r"^\s*(\w+)\s*(.*)$", r"\1 = \2", config_string, flags=re.M, count=0)
+      # now the config should adhere to toml spec.
+      self._config = tomllib.loads(config_string)
+
+  def read(self):
+    self.port = int(self._config.get("port", "6600"))
+
+    httpd_defined  = False
+    if "audio_output" in self._config:
+      for audio_output in self._config["audio_output"]:
+        if 'type' in audio_output and audio_output['type'] == 'httpd':
+          httpd_defined = True
+          if 'port' in audio_output:
+            self.streaming_port = audio_output['port']
+          if 'name' in audio_output:
+            self.device_name = audio_output['name']
+
+    if not httpd_defined:
+      raise SyntaxError('No httpd audio output defined.')
+    if not self.streaming_port:
+      raise SyntaxError('No httpd streaming port defined.')
+    if not self.streaming_port.isdigit():
+      raise SyntaxError('Invalid http streaming port defined: ' + self.streaming_port + '.')
+    if not self.device_name:
+      raise SyntaxError('No cast device name defined')
 
 
 @dataclasses.dataclass
@@ -54,6 +116,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   @dataclasses.dataclass
   class CastStatus():
     def __init__(self):
+      self.cast_finder  = None
       self.controller   = None
       self.chromecast   = None
       self.media_status = None
@@ -66,43 +129,36 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self.dab_label = None
       self.dab_image = None
 
-  @dataclasses.dataclass
-  class Config():
-    def __init__(self, cast_url, cast_receiver_url, mpd_port, device_name):
-      self.cast_receiver_url = cast_receiver_url
-      self.mpd_port          = mpd_port
-      self.device_name       = device_name
-      self.cast_url          = cast_url
-      self.default_image     = 'https://www.musicpd.org/logo.png'
-
-
-  def __init__(self, cast_url, cast_receiver_url, mpd_port, device_name):
-    self._config     = self.Config(cast_url, cast_receiver_url, mpd_port, device_name)
-    self._updater    = self.UpdateTasks()
-    self._cast       = self.CastStatus()
-    self._image_server = ImageRequestHandler(cast_receiver_url.host, cast_receiver_url.port)
-    self._mpd_client = mpd.asyncio.MPDClient()
+  def __init__(self, config_filename, my_ip, port):
+    self.cast_receiver_url = URL.build(scheme = 'http', host = my_ip, port = port, path = CAST_PATH + '/' + CAST_PAGE)
+    self._mpd_config   = MpdConfig(config_filename)
+    if not my_ip:
+      return
+    self._mpd_config.initialize()
+    self._updater      = self.UpdateTasks()
+    self._cast         = self.CastStatus()
+    self._image_server = ImageRequestHandler(my_ip, port)
+    self._mpd_client   = mpd.asyncio.MPDClient()
     self._dabserver_current_station = None
-    self._cast_finder   = None
 
   def waitfor_and_register_castdevice(self):
     if not self._cast.chromecast:
-      self._cast_finder = CastFinder(self._config.device_name)
-      self._cast_finder.do_discovery()
-      if self._cast_finder.device:
-        self._cast.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast_finder.device, Zeroconf())
+      self._cast.cast_finder = CastFinder(self._mpd_config.device_name)
+      self._cast.cast_finder.do_discovery()
+      if self._cast.cast_finder.device:
+        self._cast.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast.cast_finder.device, Zeroconf())
 
         self._cast.chromecast.wait()
         if self._cast.chromecast.app_id != pychromecast.IDLE_APP_ID:
           self._cast.chromecast.quit_app()
           time.sleep(0.5)
-        self._cast.controller = LocalMediaPlayerController(str(self._config.cast_receiver_url), False)
+        self._cast.controller = LocalMediaPlayerController(str(self.cast_receiver_url), False)
         self._cast.chromecast.register_handler(self._cast.controller)  # allows Chromecast to use Local Media Player app
         self._cast.chromecast.register_connection_listener(self)  # await new_connection_status() => re-initialize
         self._cast.controller.register_status_listener(self)      # await new_media_status() / load_media_failed()
         #self._cast.chromecast.register_status_listener(self)     # await new_cast_status()  => not of interest
 
-      self._cast_finder = None
+      self._cast.cast_finder = None
 
   def new_media_status(self, status):
     self._cast.media_status = status
@@ -121,7 +177,8 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
     # initiate the cast
     self._cast.chromecast.wait()
-    self._cast.controller.play_media(str(self._config.cast_url), **args)
+    cast_url = self._mpd_config.cast_url().with_host(self.cast_receiver_url.host)
+    self._cast.controller.play_media(str(cast_url), **args)
     await self._cast.media_event.wait()
     self._cast.media_event.clear()
 
@@ -161,7 +218,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self._stop_update_tasks()
 
     song_file = song_info['file']
-    cast_data = CastData(image_url = self._config.default_image)
+    cast_data = CastData(image_url = DEFAULT_IMAGE)
 
     if song_file.startswith('http'):
       tvh_channel = TvheadendChannel(song_file)
@@ -229,7 +286,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
   async def cast_until_connection_lost(self):
     if not self._mpd_client.connected:
-      await self._mpd_client.connect('localhost', self._config.mpd_port)
+      await self._mpd_client.connect('localhost', self._mpd_config.port)
 
     initial_mpd_status = await self._mpd_client.status()
     # avoid spontaneous playback when chromecast becomes available, eg after nightly reboot
@@ -273,12 +330,19 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self._handle_mpd_stop_play()
 
   async def stop(self):
-    if self._cast_finder:
-      self._cast_finder.cancel()
+    if self._cast.cast_finder:
+      self._cast.cast_finder.cancel()
     else:
       self._mpd_client.stop()
       self._mpd_client.disconnect()
       self._handle_mpd_stop_play()
 
   def get_routes(self):
-    return self._image_server.get_routes()
+    return (self._image_server.get_routes()
+		     + [web.get(r'', self.get_webui), web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
+
+  async def get_webui(self, request):
+    return web.FileResponse('/usr/share/mpdcast-dab/webui/index.htm')
+
+  def init_okay(self):
+    return self._mpd_config.init_okay
