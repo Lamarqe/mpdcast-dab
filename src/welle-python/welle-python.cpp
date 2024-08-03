@@ -170,10 +170,17 @@ class PythonRadioController : public RadioControllerInterface {
     PythonRadioController(PyObject* pythonObj, const char* device_name, int gain): pool(1)
     {
       device = CInputFactory::GetDevice(*this, device_name);
-      if (device == nullptr) {
-          std::cout << "Could not start device" << std::endl;
-          return;
+      if (device == nullptr)
+      {
+        return;
       }
+      if (device->getID() == CDeviceID::NULLDEVICE) {
+        // We are not interested in a non-functional fallback device.
+        delete device;
+        device = nullptr;
+        return;
+      }
+
       this->python_impl = pythonObj;
       Py_XINCREF (python_impl);
 
@@ -471,7 +478,10 @@ PyObject *init_device (PyObject* /*self*/, PyObject *args)
   if (ri->device)
     return PyCapsule_New (ri, "library_object", NULL);
   else
+  {
+    delete ri;
     Py_RETURN_NONE;
+  }
 }
 
 PyObject *set_channel (PyObject */*self*/, PyObject *args) 

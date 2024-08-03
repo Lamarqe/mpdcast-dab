@@ -37,7 +37,7 @@ class DabServer():
       self.scanner = DabScanner(device)
       self.init_okay = True
     else:
-      logger.warning('No DAB device available')
+      logger.warning('No DAB device available. DAB server will be disabled.')
       self.radio_controller = None
       self.scanner = None
       self.init_okay = False
