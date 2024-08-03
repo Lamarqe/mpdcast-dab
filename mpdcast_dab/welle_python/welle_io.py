@@ -22,6 +22,34 @@ import mpdcast_dab.welle_python.libwelle_py as welle_io
 
 logger = logging.getLogger(__name__)
 
+class CallbackForwarder():
+  # This class forwards all c-lib callbacks to the actual Interface object
+  # Making this indirect has two reasons:
+	# 1: It allows dynamic controller objects in python without having to re-initialize the device in C
+  # 2: The indirection includes a thread handover into async which is required anyways
+
+  def __init__(self, target = None):
+    self._forward_object = target
+    self._loop = asyncio.get_event_loop()
+
+  def subscribe_for_callbacks(self, target) -> bool:
+    if self._forward_object is not None:
+      return False
+    self._forward_object = target
+    return True
+
+  def unsubscribe_from_callbacks(self) -> bool:
+    if self._forward_object is None:
+      return False
+    self._forward_object = None
+    return True
+
+  def __getattr__(self, attr):
+    method = getattr(self._forward_object, attr)
+    def asyncio_callback(*args, **kwargs):
+      asyncio.run_coroutine_threadsafe(method(*args, **kwargs), self._loop)
+    return asyncio_callback
+
 
 class ProgrammeHandlerInterface():
 
@@ -77,34 +105,6 @@ class RadioControllerInterface():
     pass
 
 
-class CallbackForwarder():
-  # This class forwards all c-lib callbacks to the actual RadioControllerInterface
-  # Making this indirect has two reasons:
-	# 1: It allows dynamic controller objects in python without having to re-initialize the device in C
-  # 2: The indirection includes a thread handover into async which is required anyways
-
-  def __init__(self, target = None):
-    self._forward_object = target
-    self._loop = asyncio.get_event_loop()
-
-  def subscribe_for_callbacks(self, target) -> bool:
-    if self._forward_object is not None:
-      return False
-    self._forward_object = target
-    return True
-
-  def unsubscribe_from_callbacks(self) -> bool:
-    if self._forward_object is None:
-      return False
-    self._forward_object = None
-    return True
-
-  def __getattr__(self, attr):
-    method = getattr(self._forward_object, attr)
-    def asyncio_callback(*args, **kwargs):
-      asyncio.run_coroutine_threadsafe(method(*args, **kwargs), self._loop)
-    return asyncio_callback
-
 class DabDevice():
   def __init__(self, device_name: str = 'auto', gain: int = -1):
     self._forwarder = CallbackForwarder()
@@ -130,7 +130,8 @@ class DabDevice():
     if not self._capsule:
       return False
     forwarder = CallbackForwarder(handler)
-    handler._program_forwarder = forwarder
+    # small hack, required as otherwise the forwarder and its handler will be garbage collected
+    handler.forwarder = forwarder
     return welle_io.subscribe_program(self._capsule, forwarder, service_id)
 
   def unsubscribe_program(self, service_id: int) -> bool:
