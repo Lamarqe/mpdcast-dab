@@ -110,7 +110,7 @@ def main():
   try:
     loop = asyncio.get_event_loop()
     loop.run_until_complete(setup_webserver(runner, WEB_PORT))
-  except Exception as ex:
+  except (OSError, KeyboardInterrupt, asyncio.exceptions.CancelledError) as ex:
     logger.error('Fatal. Could not set up web server. Exiting')
     logger.error(str(ex))
     redirectors.restore_out_streams()
