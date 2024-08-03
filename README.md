@@ -56,8 +56,10 @@ The command-line parameters are:
 
 Parameter | Description | Default Value
 ------ | ---------- | ---------- 
---verbose | Print debug information | False
---conf | Path to MPD config | /etc/mpd.conf
+--conf CONF | mpd config file to use. | /etc/mpd.conf
+--disable-dabserver | Disable DAB server functionality | False
+--disable-mpdcast | Disable MPD Cast functionality | False
+--verbose | Enable verbose output | False
 
 Supported Hardware
 ====================
