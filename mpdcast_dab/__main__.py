@@ -81,19 +81,21 @@ def get_args():
 
 
 def prepare_cast(options, my_ip, web_app):
+  if options['disable_mpdcast']:
+    logger.warning('Disabling MPD cast functionality')
+    return None
   mpd_caster = MpdCaster(options['conf'], my_ip, options['port'])
-  if not options['disable_mpdcast']:
-    mpd_caster.initialize()
-  if not mpd_caster.init_okay():
+  if not mpd_caster.initialize():
     return None
   web_app.add_routes(mpd_caster.get_routes())
   return mpd_caster
 
 def prepare_dab(options, my_ip, web_app):
+  if options['disable_dabserver']:
+    logger.warning('Disabling DAB server functionality')
+    return None
   dab_server = DabServer(my_ip, options['port'])
-  if not options['disable_dabserver']:
-    dab_server.initialize()
-  if not dab_server.init_okay:
+  if not dab_server.initialize():
     return None
   web_app.add_routes(dab_server.get_routes())
   return dab_server

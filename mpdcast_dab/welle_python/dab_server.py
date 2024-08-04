@@ -45,6 +45,7 @@ class DabServer():
       self.init_okay = True
     else:
       logger.warning('No DAB device available. DAB server will be disabled.')
+    return self.init_okay
 
   def get_routes(self):
     return [web.get(r'', self.get_webui),

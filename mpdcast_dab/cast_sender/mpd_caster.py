@@ -58,6 +58,7 @@ class MpdConfig():
     except (FileNotFoundError, SyntaxError) as error:
       logger.warning('Failed to read MPD Cast configuration. Disabling.')
       logger.warning(str(error))
+    return self.init_okay
 
   def load(self):
     logger.info('Loading config from %s', self._filename)
@@ -139,7 +140,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self._dabserver_current_station = None
 
   def initialize(self):
-    self._mpd_config.initialize()
+    return self._mpd_config.initialize()
 
   def waitfor_and_register_castdevice(self):
     if not self._cast.chromecast:
