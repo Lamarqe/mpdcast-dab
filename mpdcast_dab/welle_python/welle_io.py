@@ -19,6 +19,7 @@ import atexit
 import time
 import logging
 import mpdcast_dab.welle_python.libwelle_py as welle_io
+from mpdcast_dab.welle_python.dab_callbacks import ProgrammeHandlerInterface, RadioControllerInterface
 
 logger = logging.getLogger(__name__)
 
@@ -49,61 +50,6 @@ class CallbackForwarder():
     def asyncio_callback(*args, **kwargs):
       asyncio.run_coroutine_threadsafe(method(*args, **kwargs), self._loop)
     return asyncio_callback
-
-
-class ProgrammeHandlerInterface():
-
-  async def on_frame_errors(self, frame_errors: int) -> None:
-    pass
-
-  async def on_new_audio(self, audio_data: bytes, sample_rate: int, mode: str) -> None:
-    pass
-
-  async def on_rs_errors(self, uncorrected_errors: int, num_corrected_errors: int) -> None:
-    pass
-
-  async def on_aac_errors(self, aac_errors: int) -> None:
-    pass
-
-  async def on_new_dynamic_label(self, label: str) -> None:
-    pass
-
-  async def on_mot(self, data: bytes, mime_type: str, name: str) -> None:
-    pass
-
-
-class RadioControllerInterface():
-
-  async def on_snr(self, snr: float) -> None:
-    pass
-
-  async def on_frequency_corrector_change(self, fine: int, coarse: int) -> None:
-    pass
-
-  async def on_sync_change(self, is_sync: int) -> None:
-    pass
-
-  async def on_signal_presence(self, is_signal: int) -> None:
-    pass
-
-  async def on_service_detected(self, service_id: int) -> None:
-    pass
-
-  async def on_new_ensemble(self, ensemble_id: int) -> None:
-    pass
-
-  async def on_set_ensemble_label(self, label: str) -> None:
-    pass
-
-  async def on_datetime_update(self, timestamp: int) -> None:
-    pass
-
-  async def on_fib_decode_success(self, crc_check_ok: int, fib: int) -> None:
-    pass
-
-  async def on_message(self, text: str, text2: str, is_error: int) -> None:
-    pass
-
 
 class DabDevice():
   def __init__(self, device_name: str = 'auto', gain: int = -1):

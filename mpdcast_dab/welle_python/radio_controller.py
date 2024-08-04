@@ -18,14 +18,14 @@ import asyncio
 import datetime
 import logging
 from mpdcast_dab.welle_python.wav_programme_handler import WavProgrammeHandler
-from mpdcast_dab.welle_python.welle_io import RadioControllerInterface, DabDevice
+from mpdcast_dab.welle_python.dab_callbacks import RadioControllerInterface
 
 logger = logging.getLogger(__name__)
 
 class RadioController(RadioControllerInterface):
   PROGRAM_DISCOVERY_TIMEOUT = 10
 
-  def __init__(self, device: DabDevice):
+  def __init__(self, device):
     self._dab_device = device
     self.programs            = {}
     self._programme_handlers = {}

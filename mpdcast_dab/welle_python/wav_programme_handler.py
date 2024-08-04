@@ -17,7 +17,7 @@
 import asyncio
 import logging
 import dataclasses
-from mpdcast_dab.welle_python.welle_io import ProgrammeHandlerInterface
+from mpdcast_dab.welle_python.dab_callbacks import ProgrammeHandlerInterface
 
 logger = logging.getLogger(__name__)
 

@@ -22,7 +22,6 @@ from aiohttp import web
 from mpdcast_dab.welle_python.radio_controller import RadioController
 from mpdcast_dab.welle_python.dab_scanner import DabScanner
 from mpdcast_dab.welle_python.wav_programme_handler import UnsubscribedError
-from mpdcast_dab.welle_python.welle_io import DabDevice
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +37,11 @@ class DabServer():
     self._shutdown_in_progress = False
 
   def initialize(self):
-    device = DabDevice('auto')
-    if device.is_usable():
-      self.radio_controller = RadioController(device)
-      self.scanner = DabScanner(device)
+    welle_io = __import__('mpdcast_dab.welle_python.welle_io').welle_python.welle_io
+    dab_device = welle_io.DabDevice('auto')
+    if dab_device.is_usable():
+      self.radio_controller = RadioController(dab_device)
+      self.scanner = DabScanner(dab_device)
       self.init_okay = True
     else:
       logger.warning('No DAB device available. DAB server will be disabled.')

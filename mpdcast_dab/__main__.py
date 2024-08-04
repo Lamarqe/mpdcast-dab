@@ -95,7 +95,12 @@ def prepare_dab(options, my_ip, web_app):
     logger.warning('Disabling DAB server functionality')
     return None
   dab_server = DabServer(my_ip, options['port'])
-  if not dab_server.initialize():
+  try:
+    if not dab_server.initialize():
+      return None
+  except ModuleNotFoundError as error:
+    logger.warning('Failed to load DAB+ library')
+    logger.warning(str(error))
     return None
   web_app.add_routes(dab_server.get_routes())
   return dab_server
@@ -135,7 +140,7 @@ def main():
     logger.error(str(ex))
     redirectors.restore_out_streams()
     sys.exit(1)
-
+  print('Succesfully initialized MpdCast DAB')
   try:
     # run the webserver in parallel to the cast task
     while True:
@@ -155,6 +160,7 @@ def main():
       loop.run_until_complete(dab_server.stop())
     loop.run_until_complete(runner.cleanup())
     redirectors.restore_out_streams()
+    print('Stopping MpdCast DAB as requested')
 
 if __name__ == '__main__':
   main()

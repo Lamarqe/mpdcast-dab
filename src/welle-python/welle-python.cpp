@@ -614,8 +614,5 @@ PyInit_libwelle_py (void) {
   if (m == NULL)
     return NULL;
   
-// Don't remove the verbose message below. Otherwise, redict of C stdout/stderr fails.
-// At least one char must be printed from C to stdout before mpdcast_dab.cast_sender.OutputGrabber can be used
-  std::cout << "Successfully initialized C library." << std::endl;
   return m;
 }
