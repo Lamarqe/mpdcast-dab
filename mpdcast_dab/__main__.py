@@ -30,8 +30,6 @@ from mpdcast_dab.welle_python.dab_server import DabServer
 
 logger = logging.getLogger(__name__)
 
-WEB_PORT = 8080
-
 class RedirectedStreams():
   def __init__(self):
     self._stdout_grabber = OutputGrabber(sys.stdout, 'Welle.io', logging.Logger.error)
@@ -73,15 +71,16 @@ def update_logger_config(verbose):
 
 def get_args():
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent')
-  parser.add_argument('--conf', help = 'mpd config file to use. Default: /etc/mpd.conf', default = '/etc/mpd.conf')
-  parser.add_argument('--disable-dabserver', help = 'Disable DAB server functionality', action = 'store_true')
-  parser.add_argument('--disable-mpdcast', help = 'Disable MPD Cast functionality', action = 'store_true')
-  parser.add_argument('--verbose', help = 'Enable verbose output', action = 'store_true')
+  parser.add_argument('-p', '--port', help= 'Communication port to use. Default: 8864', default= '8864')
+  parser.add_argument('-c', '--conf', help= 'MPD config file to use. Default: /etc/mpd.conf', default= '/etc/mpd.conf')
+  parser.add_argument('--disable-dabserver', help= 'Disable DAB server functionality', action= 'store_true')
+  parser.add_argument('--disable-mpdcast', help= 'Disable MPD Cast functionality', action= 'store_true')
+  parser.add_argument('--verbose', help= 'Enable verbose output', action= 'store_true')
   return vars(parser.parse_args())
 
 
 def prepare_cast(options, my_ip, web_app):
-  mpd_caster = MpdCaster(options['conf'], my_ip, WEB_PORT)
+  mpd_caster = MpdCaster(options['conf'], my_ip, options['port'])
   if not options['disable_mpdcast']:
     mpd_caster.initialize()
   if not mpd_caster.init_okay():
@@ -90,7 +89,7 @@ def prepare_cast(options, my_ip, web_app):
   return mpd_caster
 
 def prepare_dab(options, my_ip, web_app):
-  dab_server = DabServer(my_ip, WEB_PORT)
+  dab_server = DabServer(my_ip, options['port'])
   if not options['disable_dabserver']:
     dab_server.initialize()
   if not dab_server.init_okay:
@@ -127,7 +126,7 @@ def main():
 
   runner = web.AppRunner(web_app)
   try:
-    loop.run_until_complete(setup_webserver(runner, WEB_PORT))
+    loop.run_until_complete(setup_webserver(runner, options['port']))
   except OSError as ex:
     logger.error('Fatal. Could not set up web server. Exiting')
     logger.error(str(ex))
