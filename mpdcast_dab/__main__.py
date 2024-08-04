@@ -22,7 +22,7 @@ import asyncio
 import argparse
 import logging
 import ifaddr
-from zeroconf import Zeroconf
+import zeroconf
 from aiohttp import web
 
 from mpdcast_dab.cast_sender.output_grabber import OutputGrabber
@@ -30,6 +30,10 @@ from mpdcast_dab.cast_sender.mpd_caster import MpdCaster
 from mpdcast_dab.welle_python.dab_server import DabServer
 
 logger = logging.getLogger(__name__)
+blocking_zconf = zeroconf.Zeroconf()  # zeroconf instance used for tasks outside of asyncio
+mpd_caster = None
+dab_server = None
+runner     = None
 
 class RedirectedStreams():
   def __init__(self):
@@ -86,6 +90,7 @@ def prepare_cast(options, my_ip, web_app):
   if options['disable_mpdcast']:
     logger.warning('Disabling MPD cast functionality')
     return None
+  global mpd_caster
   mpd_caster = MpdCaster(options['conf'], my_ip, options['port'])
   if not mpd_caster.initialize():
     return None
@@ -96,6 +101,7 @@ def prepare_dab(options, my_ip, web_app):
   if options['disable_dabserver']:
     logger.warning('Disabling DAB server functionality')
     return None
+  global dab_server
   dab_server = DabServer(my_ip, options['port'])
   try:
     if not dab_server.initialize():
@@ -134,6 +140,7 @@ def main():
     redirectors.restore_out_streams()
     sys.exit(1)
 
+  global runner
   runner = web.AppRunner(web_app)
   try:
     loop.run_until_complete(setup_webserver(runner, options['port']))
@@ -144,26 +151,31 @@ def main():
     sys.exit(1)
   logger.info('Succesfully initialized MpdCast DAB')
   try:
-    zconf = Zeroconf()
-    # run the webserver in parallel to the cast task
-    while True:
-      if mpd_caster:
-        # wait until we find the cast device in the network
-        loop.run_until_complete(mpd_caster.waitfor_and_register_castdevice(zconf))
-        # run the cast (until chromecast or MPD disconnect)
-        loop.run_until_complete(mpd_caster.cast_until_connection_lost())
-      else:
-        # DAB processing is fully built into the web server. no additional tasks required
-        loop.run_until_complete(asyncio.sleep(3600))
+    loop.run_until_complete(mainloop())
 
   except KeyboardInterrupt:
-    logger.info('Stopping MpdCast DAB as requested')
-    if mpd_caster:
-      loop.run_until_complete(mpd_caster.stop())
-    if dab_server:
-      loop.run_until_complete(dab_server.stop())
-    loop.run_until_complete(runner.cleanup())
+    loop.run_until_complete(cleanup())
     redirectors.restore_out_streams()
+
+async def mainloop():
+  # run the webserver in parallel to the cast task
+  while True:
+    if mpd_caster:
+      # wait until we find the cast device in the network
+      await mpd_caster.waitfor_and_register_castdevice(blocking_zconf)
+      # run the cast (until chromecast or MPD disconnect)
+      await mpd_caster.cast_until_connection_lost()
+    else:
+      # DAB processing is fully built into the web server. no additional tasks required
+      await asyncio.sleep(3600)
+
+async def cleanup():
+  logger.info('Stopping MpdCast DAB as requested')
+  if mpd_caster:
+    await mpd_caster.stop()
+  if dab_server:
+    await dab_server.stop()
+  await runner.cleanup()
 
 if __name__ == '__main__':
   main()

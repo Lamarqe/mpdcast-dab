@@ -15,12 +15,10 @@
 """MPD http server stream to google cast sync module."""
 
 import asyncio
-import time
 import re
 import logging
 import dataclasses
 import tomllib
-from zeroconf import Zeroconf
 from aiohttp import web
 from yarl import URL
 import pychromecast
@@ -142,13 +140,16 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   def initialize(self):
     return self._mpd_config.initialize()
 
-  async def waitfor_and_register_castdevice(self, zconf):
+  async def waitfor_and_register_castdevice(self, blocking_zconf):
     if not self._cast.chromecast:
       self._cast.cast_finder = CastFinder(self._mpd_config.device_name)
       await self._cast.cast_finder.do_discovery()
       if self._cast.cast_finder.device:
-        self._cast.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast.cast_finder.device, zconf)
         loop = asyncio.get_running_loop()
+        self._cast.chromecast = await loop.run_in_executor(None,
+                                                           pychromecast.get_chromecast_from_cast_info,
+                                                           self._cast.cast_finder.device,
+                                                           blocking_zconf)
         await loop.run_in_executor(None, self._cast.chromecast.wait)
         if self._cast.chromecast.app_id != pychromecast.IDLE_APP_ID:
           self._cast.chromecast.quit_app()
@@ -343,7 +344,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
   def get_routes(self):
     return (self._image_server.get_routes()
-		     + [web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
+         + [web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
 
   def init_okay(self):
     return self._mpd_config.init_okay
