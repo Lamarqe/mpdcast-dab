@@ -71,11 +71,11 @@ def update_logger_config(verbose):
 
 def get_args():
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent')
-  parser.add_argument('-p', '--port', help= 'Communication port to use. Default: 8864', default= '8864')
-  parser.add_argument('-c', '--conf', help= 'MPD config file to use. Default: /etc/mpd.conf', default= '/etc/mpd.conf')
-  parser.add_argument('--disable-dabserver', help= 'Disable DAB server functionality', action= 'store_true')
-  parser.add_argument('--disable-mpdcast', help= 'Disable MPD Cast functionality', action= 'store_true')
-  parser.add_argument('--verbose', help= 'Enable verbose output', action= 'store_true')
+  parser.add_argument('-p', '--port', help= 'Communication port to use. Default: 8864', type=int, default=8864)
+  parser.add_argument('-c', '--conf', help= 'MPD config file to use. Default: /etc/mpd.conf', default='/etc/mpd.conf')
+  parser.add_argument('--disable-dabserver', help= 'Disable DAB server functionality', action='store_true')
+  parser.add_argument('--disable-mpdcast', help= 'Disable MPD Cast functionality', action='store_true')
+  parser.add_argument('--verbose', help= 'Enable verbose output', action='store_true')
   return vars(parser.parse_args())
 
 

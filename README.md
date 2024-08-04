@@ -56,8 +56,8 @@ The command-line parameters are:
 
 Parameter | Description | Default Value
 ------ | ---------- | ---------- 
--p PORT, --port PORT | Communication port to use. | 8864
--c CONF, --conf CONF | mpd config file to use. | /etc/mpd.conf
+-p PORT, --port PORT | Communication port to use | 8864
+-c CONF, --conf CONF | MPD config file to use | /etc/mpd.conf
 --disable-dabserver | Disable DAB server functionality | False
 --disable-mpdcast | Disable MPD Cast functionality | False
 --verbose | Enable verbose output | False
