@@ -182,6 +182,9 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self._cast.controller.play_media(str(cast_url), **args)
     await self._cast.media_event.wait()
     self._cast.media_event.clear()
+    while self._cast.media_status.media_session_id is None:
+      await self._cast.media_event.wait()
+      self._cast.media_event.clear()
 
   def _handle_mpd_stop_play(self):
     self._stop_update_tasks()
