@@ -142,17 +142,17 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   def initialize(self):
     return self._mpd_config.initialize()
 
-  def waitfor_and_register_castdevice(self):
+  async def waitfor_and_register_castdevice(self, zconf):
     if not self._cast.chromecast:
       self._cast.cast_finder = CastFinder(self._mpd_config.device_name)
-      self._cast.cast_finder.do_discovery()
+      await self._cast.cast_finder.do_discovery()
       if self._cast.cast_finder.device:
-        self._cast.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast.cast_finder.device, Zeroconf())
-
-        self._cast.chromecast.wait()
+        self._cast.chromecast = pychromecast.get_chromecast_from_cast_info(self._cast.cast_finder.device, zconf)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._cast.chromecast.wait)
         if self._cast.chromecast.app_id != pychromecast.IDLE_APP_ID:
           self._cast.chromecast.quit_app()
-          time.sleep(0.5)
+          await asyncio.sleep(0.5)
         self._cast.controller = LocalMediaPlayerController(str(self.cast_receiver_url), False)
         self._cast.chromecast.register_handler(self._cast.controller)  # allows Chromecast to use Local Media Player app
         self._cast.chromecast.register_connection_listener(self)  # await new_connection_status() => re-initialize

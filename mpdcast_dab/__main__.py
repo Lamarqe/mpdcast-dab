@@ -22,6 +22,7 @@ import asyncio
 import argparse
 import logging
 import ifaddr
+from zeroconf import Zeroconf
 from aiohttp import web
 
 from mpdcast_dab.cast_sender.output_grabber import OutputGrabber
@@ -64,10 +65,11 @@ def update_logger_config(verbose):
   logging.basicConfig(format='%(name)s - %(levelname)s: %(message)s',
                       encoding='utf-8', level=internal_log_level,
                       stream=sys.stdout, force=True)
-  logging.getLogger("aiohttp").setLevel(external_log_level)
-  logging.getLogger("pychromecast").setLevel(external_log_level)
-  logging.getLogger("zeroconf").setLevel(external_log_level)
-  logging.getLogger("Welle.io").setLevel(external_log_level)
+  logging.getLogger('aiohttp').setLevel(external_log_level)
+  logging.getLogger('pychromecast').setLevel(external_log_level)
+  logging.getLogger('zeroconf').setLevel(external_log_level)
+  logging.getLogger('Welle.io').setLevel(external_log_level)
+  logging.getLogger(__name__).setLevel(logging.INFO)
 
 def get_args():
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent',
@@ -140,13 +142,14 @@ def main():
     logger.error(str(ex))
     redirectors.restore_out_streams()
     sys.exit(1)
-  print('Succesfully initialized MpdCast DAB')
+  logger.info('Succesfully initialized MpdCast DAB')
   try:
+    zconf = Zeroconf()
     # run the webserver in parallel to the cast task
     while True:
       if mpd_caster:
         # wait until we find the cast device in the network
-        mpd_caster.waitfor_and_register_castdevice()
+        loop.run_until_complete(mpd_caster.waitfor_and_register_castdevice(zconf))
         # run the cast (until chromecast or MPD disconnect)
         loop.run_until_complete(mpd_caster.cast_until_connection_lost())
       else:
@@ -154,13 +157,13 @@ def main():
         loop.run_until_complete(asyncio.sleep(3600))
 
   except KeyboardInterrupt:
+    logger.info('Stopping MpdCast DAB as requested')
     if mpd_caster:
       loop.run_until_complete(mpd_caster.stop())
     if dab_server:
       loop.run_until_complete(dab_server.stop())
     loop.run_until_complete(runner.cleanup())
     redirectors.restore_out_streams()
-    print('Stopping MpdCast DAB as requested')
 
 if __name__ == '__main__':
   main()

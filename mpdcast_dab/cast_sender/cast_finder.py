@@ -36,10 +36,7 @@ class CastFinder(pychromecast.discovery.AbstractCastListener):
   def update_cast(self, uuid, _service):
     pass
 
-  def do_discovery (self):
-    asyncio.run(self._do_discovery())
-
-  async def _do_discovery (self):
+  async def do_discovery (self):
     self._browser = pychromecast.discovery.CastBrowser(self, zeroconf.Zeroconf(), None)
     self._my_task = asyncio.Event()
     self._browser.start_discovery()
