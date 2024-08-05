@@ -53,10 +53,17 @@ class CallbackForwarder():
 
 class DabDevice():
   def __init__(self, device_name: str = 'auto', gain: int = -1):
-    self._forwarder = CallbackForwarder()
-    self._capsule = welle_io.init_device(self._forwarder, device_name, gain)
-    if self._capsule:
-      atexit.register(self.cleanup)
+    self.device_name = device_name
+    self.gain        = gain
+    self._forwarder  = CallbackForwarder()
+    self._capsule    = None
+
+  def initialize(self) -> bool:
+    self._capsule = welle_io.init_device(self._forwarder, self.device_name, self.gain)
+    if not self._capsule:
+      return False
+    atexit.register(self.cleanup)
+    return True
 
   def aquire_now(self, radio_controller: RadioControllerInterface) -> bool:
     return self._forwarder.subscribe_for_callbacks(radio_controller)

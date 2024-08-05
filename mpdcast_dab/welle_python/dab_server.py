@@ -32,20 +32,19 @@ class DabServer():
     self.port = port
     self.radio_controller = None
     self.scanner = None
-    self.init_okay = False
     self.handlers = {}
     self._shutdown_in_progress = False
+    welle_io = __import__('mpdcast_dab.welle_python.welle_io').welle_python.welle_io
+    self.dab_device = welle_io.DabDevice('auto')
 
   def initialize(self):
-    welle_io = __import__('mpdcast_dab.welle_python.welle_io').welle_python.welle_io
-    dab_device = welle_io.DabDevice('auto')
-    if dab_device.is_usable():
-      self.radio_controller = RadioController(dab_device)
-      self.scanner = DabScanner(dab_device)
-      self.init_okay = True
-    else:
+    if not self.dab_device.initialize():
       logger.warning('No DAB device available. DAB server will be disabled.')
-    return self.init_okay
+      return False
+
+    self.radio_controller = RadioController(self.dab_device)
+    self.scanner = DabScanner(self.dab_device)
+    return True
 
   def get_routes(self):
     return [web.get(r'', self.get_webui),

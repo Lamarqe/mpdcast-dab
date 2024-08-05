@@ -84,13 +84,13 @@ def prepare_dab(options, my_ip, web_app):
   if options['disable_dabserver']:
     logger.warning('Disabling DAB server functionality')
     return None
-  dab_server = DabServer(my_ip, options['port'])
   try:
-    if not dab_server.initialize():
-      return None
+    dab_server = DabServer(my_ip, options['port'])
   except ModuleNotFoundError as error:
     logger.warning('Failed to load DAB+ library')
     logger.warning(str(error))
+    return None
+  if not dab_server.initialize():
     return None
   web_app.add_routes(dab_server.get_routes())
   return dab_server
