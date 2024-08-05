@@ -44,9 +44,6 @@ class MpdConfig():
     self.streaming_port = None
     self.device_name    = None
 
-  def cast_url(self):
-    return URL.build(scheme = 'http', host = 'dummy', port = self.streaming_port)
-
   def initialize(self):
     try:
       self.load()
@@ -178,7 +175,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
     # initiate the cast
     self._cast.chromecast.wait()
-    cast_url = self._mpd_config.cast_url().with_host(self.cast_receiver_url.host)
+    cast_url = URL.build(scheme = 'http', host = self.cast_receiver_url.host, port = self._mpd_config.streaming_port)
     self._cast.controller.play_media(str(cast_url), **args)
     await self._cast.media_event.wait()
     self._cast.media_event.clear()
