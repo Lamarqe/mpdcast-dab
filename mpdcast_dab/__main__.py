@@ -97,8 +97,10 @@ def prepare_dab(options, my_ip, web_app):
 
 def main():
   options = get_args()
+
   redirectors = RedirectedStreams('Welle.io')
-  redirectors.redirect_out_streams()
+  if not options['disable_dabserver']:
+    redirectors.redirect_out_streams()
   update_logger_config(options['verbose'])
 
   my_ip = get_first_ipv4_address()
