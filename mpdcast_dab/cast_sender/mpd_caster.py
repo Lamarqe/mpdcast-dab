@@ -43,7 +43,6 @@ class MpdConfig():
     self.port           = None
     self.streaming_port = None
     self.device_name    = None
-    self.init_okay      = False
 
   def cast_url(self):
     return URL.build(scheme = 'http', host = 'dummy', port = self.streaming_port)
@@ -52,11 +51,11 @@ class MpdConfig():
     try:
       self.load()
       self.read()
-      self.init_okay = True
+      return True
     except (FileNotFoundError, SyntaxError) as error:
       logger.warning('Failed to read MPD Cast configuration. Disabling.')
       logger.warning(str(error))
-    return self.init_okay
+      return False
 
   def load(self):
     logger.info('Loading config from %s', self._filename)
@@ -345,6 +344,3 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   def get_routes(self):
     return (self._image_server.get_routes()
          + [web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
-
-  def init_okay(self):
-    return self._mpd_config.init_okay
