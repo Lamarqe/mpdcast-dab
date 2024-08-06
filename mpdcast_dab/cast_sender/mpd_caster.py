@@ -19,6 +19,7 @@ import re
 import logging
 import dataclasses
 import tomllib
+import zeroconf
 from aiohttp import web
 from yarl import URL
 import pychromecast
@@ -111,11 +112,19 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   @dataclasses.dataclass
   class CastStatus():
     def __init__(self):
-      self.cast_finder  = None
       self.controller   = None
       self.chromecast   = None
       self.media_status = None
-      self.media_event = asyncio.Event()
+      self.media_event  = asyncio.Event()
+      self.receiver_url = None
+      self.zconf        = zeroconf.Zeroconf()
+
+  @dataclasses.dataclass
+  class MpdStatus():
+    def __init__(self):
+      self.config      = None
+      self.image_cache = None
+      self.client      = None
 
   @dataclasses.dataclass
   class UpdateTasks():
@@ -125,38 +134,69 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self.dab_image = None
 
   def __init__(self, config_filename, my_ip, port):
-    self.cast_receiver_url = URL.build(scheme = 'http', host = my_ip, port = port, path = CAST_PATH + '/' + CAST_PAGE)
-    self._mpd_config   = MpdConfig(config_filename)
-    self._updater      = self.UpdateTasks()
-    self._cast         = self.CastStatus()
-    self._image_server = ImageRequestHandler(my_ip, port)
-    self._mpd_client   = mpd.asyncio.MPDClient()
+    self._mpd             = self.MpdStatus()
+    self._updater         = self.UpdateTasks()
+    self._cast            = self.CastStatus()
+
+    self._mpd.config      = MpdConfig(config_filename)
+    self._mpd.image_cache = ImageRequestHandler(my_ip, port)
+    self._mpd.client      = mpd.asyncio.MPDClient()
+
+    self._cast.receiver_url = URL.build(scheme = 'http', host = my_ip, port = port, path = CAST_PATH + '/' + CAST_PAGE)
+
     self._dabserver_current_station = None
+    self._main_task       = None
 
   def initialize(self):
-    return self._mpd_config.initialize()
+    return self._mpd.config.initialize()
 
-  async def waitfor_and_register_castdevice(self, blocking_zconf):
+  async def start(self):
+    loop = asyncio.get_running_loop()
+    self._main_task = loop.create_task(self.run())
+
+  async def run(self):
+    while True:
+      try:
+        cast_finder = CastFinder(self._mpd.config.device_name)
+        # wait until we find the cast device in the network
+        await self.waitfor_and_register_castdevice(cast_finder)
+      except asyncio.CancelledError:
+        cast_finder.cancel()
+        raise
+      try:
+        # run the cast (until chromecast or MPD disconnect)
+        await self.cast_until_connection_lost()
+      except asyncio.CancelledError:
+        self._mpd.client.stop()
+        self._mpd.client.disconnect()
+        self._handle_mpd_stop_play()
+        raise
+
+  async def stop(self):
+    self._main_task.cancel()
+    try:
+      await self._main_task
+    except asyncio.CancelledError:
+      pass
+
+  async def waitfor_and_register_castdevice(self, cast_finder):
     if not self._cast.chromecast:
-      self._cast.cast_finder = CastFinder(self._mpd_config.device_name)
-      await self._cast.cast_finder.do_discovery()
-      if self._cast.cast_finder.device:
+      await cast_finder.do_discovery()
+      if cast_finder.device:
         loop = asyncio.get_running_loop()
         self._cast.chromecast = await loop.run_in_executor(None,
                                                            pychromecast.get_chromecast_from_cast_info,
-                                                           self._cast.cast_finder.device,
-                                                           blocking_zconf)
+                                                           cast_finder.device,
+                                                           self._cast.zconf)
         await loop.run_in_executor(None, self._cast.chromecast.wait)
         if self._cast.chromecast.app_id != pychromecast.IDLE_APP_ID:
           self._cast.chromecast.quit_app()
           await asyncio.sleep(0.5)
-        self._cast.controller = LocalMediaPlayerController(str(self.cast_receiver_url), False)
+        self._cast.controller = LocalMediaPlayerController(str(self._cast.receiver_url), False)
         self._cast.chromecast.register_handler(self._cast.controller)  # allows Chromecast to use Local Media Player app
         self._cast.chromecast.register_connection_listener(self)  # await new_connection_status() => re-initialize
         self._cast.controller.register_status_listener(self)      # await new_media_status() / load_media_failed()
         #self._cast.chromecast.register_status_listener(self)     # await new_cast_status()  => not of interest
-
-      self._cast.cast_finder = None
 
   def new_media_status(self, status):
     self._cast.media_status = status
@@ -175,7 +215,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
     # initiate the cast
     self._cast.chromecast.wait()
-    cast_url = URL.build(scheme = 'http', host = self.cast_receiver_url.host, port = self._mpd_config.streaming_port)
+    cast_url = URL.build(scheme = 'http', host = self._cast.receiver_url.host, port = self._mpd.config.streaming_port)
     self._cast.controller.play_media(str(cast_url), **args)
     await self._cast.media_event.wait()
     self._cast.media_event.clear()
@@ -268,9 +308,9 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
     if 'artist' in song_info:
       cast_data.artist = song_info['artist']
-      picture_dict = await self._mpd_client.readpicture(song_file)
+      picture_dict = await self._mpd.client.readpicture(song_file)
       if picture_dict:
-        cast_data.image_url = self._image_server.store_song_picture(song_file, picture_dict)
+        cast_data.image_url = self._mpd.image_cache.store_song_picture(song_file, picture_dict)
 
   def new_cast_status(self, status):
     if self._cast.chromecast:
@@ -286,18 +326,18 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       self._cast.chromecast = None
 
   async def cast_until_connection_lost(self):
-    if not self._mpd_client.connected:
-      await self._mpd_client.connect('localhost', self._mpd_config.port)
+    if not self._mpd.client.connected:
+      await self._mpd.client.connect('localhost', self._mpd.config.port)
 
-    initial_mpd_status = await self._mpd_client.status()
+    initial_mpd_status = await self._mpd.client.status()
     # avoid spontaneous playback when chromecast becomes available, eg after nightly reboot
     ignore_current_playback = bool(initial_mpd_status['state'] == 'play')
     cast_is_active      = False
     processed_mpd_song  = ''
 
     try:
-      async for _ in self._mpd_client.idle():
-        mpd_client_status = await self._mpd_client.status()
+      async for _ in self._mpd.client.idle():
+        mpd_client_status = await self._mpd.client.status()
         mpd_is_playing = bool(mpd_client_status['state'] == 'play')
 
         if not self._cast.chromecast:
@@ -321,7 +361,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
           processed_mpd_song = ''
           cast_is_active = False
 
-        current_mpd_song = await self._mpd_client.currentsong()
+        current_mpd_song = await self._mpd.client.currentsong()
         if cast_is_active and current_mpd_song and current_mpd_song != processed_mpd_song:
           logger.info('current_mpd_song: %s', current_mpd_song)
           await self._handle_mpd_new_song(current_mpd_song)
@@ -330,14 +370,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       # Connection to MPD lost
       self._handle_mpd_stop_play()
 
-  async def stop(self):
-    if self._cast.cast_finder:
-      self._cast.cast_finder.cancel()
-    else:
-      self._mpd_client.stop()
-      self._mpd_client.disconnect()
-      self._handle_mpd_stop_play()
-
   def get_routes(self):
-    return (self._image_server.get_routes()
+    return (self._mpd.image_cache.get_routes()
          + [web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
