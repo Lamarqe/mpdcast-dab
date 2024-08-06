@@ -138,7 +138,10 @@ def main():
 
   logger.info('Succesfully initialized MpdCast DAB')
   # prepare the main loop
-  mainloop_task = loop.create_task(asyncio.sleep(3600))
+  async def mainloop():
+    while True:
+      await asyncio.sleep(3600)
+  mainloop_task = loop.create_task(mainloop())
 
   # set up cleanup handler...
   def sigterm_handler(signal_number, stack_frame):
