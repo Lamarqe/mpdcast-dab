@@ -194,10 +194,6 @@ class PythonRadioController : public RadioControllerInterface {
 
     virtual ~PythonRadioController() 
     {
-      if (device != nullptr)
-      {
-        delete device;
-      }
       Py_XDECREF (python_impl);
     }
     
