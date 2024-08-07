@@ -156,7 +156,7 @@ class DabServer():
     raise web.HTTPNotFound()
 
 
-  async def get_audio(self, request, retry = True):
+  async def get_audio(self, request):
     if self._shutdown_in_progress:
       raise web.HTTPServiceUnavailable()
 
@@ -167,12 +167,11 @@ class DabServer():
     logger.info('new audio request for %s', program)
 
     # Check if the device is busy with streaming another channel
-    if retry and self.radio_controller.get_current_channel() and self.radio_controller.get_current_channel() != channel:
+    if self.radio_controller.get_current_channel() and self.radio_controller.get_current_channel() != channel:
       # This might be a program switch with the new subscription request coming faster then the unsubscribe.
-      # So lets check by waiting for half a second and then retry.
-      # In case of a switch, the unsubscribe will be processed then
+      # So we wait for half a second and continue with the request processing
+      # In case of a switch, the unsubscribe will have been processed until then
       await asyncio.sleep(0.5)
-      await self.get_audio(request, False)
 
     handler = await self.radio_controller.subscribe_program(channel, program)
     if not handler:

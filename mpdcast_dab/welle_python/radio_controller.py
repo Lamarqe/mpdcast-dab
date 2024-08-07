@@ -79,13 +79,13 @@ class RadioController(RadioControllerInterface):
     async with self._subscription_lock:
       # Block actions in case there is another channel active
       if self._current_channel and self._current_channel != channel:
-        logger.error('there is another channel active')
+        logger.warning('there is another channel active')
         return None
 
       # If There is no active channel, tune the device to the channel
       if not self._current_channel:
         if not self._dab_device.aquire_now(self):
-          logger.error('DAB device is locked. No playback possible.')
+          logger.warning('DAB device is locked. No playback possible.')
           return None
 
         tune_okay = self._dab_device.set_channel(channel)
