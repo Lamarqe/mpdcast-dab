@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 class RadioController(RadioControllerInterface):
   PROGRAM_DISCOVERY_TIMEOUT = 10
+  CHANNEL_UNSUBSCRIBE_DELAY = 5
 
   def __init__(self, device):
     self._dab_device = device
@@ -33,6 +34,8 @@ class RadioController(RadioControllerInterface):
     self._current_channel = ''
     self.ensemble_label   = None
     self.datetime         = None
+    self._cancel_delayed_unsubscribe = asyncio.Event()
+    self._cancel_delayed_unsubscribe.set()
 
     # lock to prevent parallel initialization from multiple users
     self._subscription_lock = asyncio.Lock()
@@ -76,6 +79,18 @@ class RadioController(RadioControllerInterface):
 
   # returns handler in case the subscription suceeded, otherwise None
   async def subscribe_program(self, channel, program_name):
+    # first check, if there is a delayed un-subscription pending
+    if not self._cancel_delayed_unsubscribe.is_set():
+      # we have an active subscription, but no subscribers.
+      # check if we can reuse the subscription
+      if self._current_channel == channel:
+        # yes, we can. So notify to cancel the unsubscribe
+        self._cancel_delayed_unsubscribe.set()
+      else:
+        # no, we cant. Trigger the delayed unsubscribe to happen immediately
+        async with self._subscription_lock:
+          await self._reset_channel()
+    # now we do the actual subscribe job
     async with self._subscription_lock:
       # Block actions in case there is another channel active
       if self._current_channel and self._current_channel != channel:
@@ -158,14 +173,27 @@ class RadioController(RadioControllerInterface):
       self._dab_device.unsubscribe_program(program_pid)
       self._programme_handlers[program_pid].release_waiters()
       del self._programme_handlers[program_pid]
-      await self._reset_if_no_handler()
+      asyncio.get_running_loop().create_task(self._reset_if_no_handler())
 
   async def _reset_if_no_handler(self):
-    if not self._programme_handlers:
-      await self._reset()
+    if self._programme_handlers:
+      return
+    # wait to see if someone wants to reuse the subscription
+    reset_target_channel = self._current_channel
+    try:
+      self._cancel_delayed_unsubscribe.clear()
+      await asyncio.wait_for(self._cancel_delayed_unsubscribe.wait(), RadioController.CHANNEL_UNSUBSCRIBE_DELAY)
+      # as the subscription will be reused, dont reset
+      return
+    except TimeoutError:
+      # timeout passed without somebody cancelling the delayed unsubscribe
+      async with self._subscription_lock:
+        # make sure our job is still valid (nobody in the meantime triggered an immediate unsubscribe)
+        if self._current_channel and self._current_channel == reset_target_channel:
+          await self._reset_channel()
 
 
-  async def _reset(self):
+  async def _reset_channel(self):
     self._dab_device.set_channel("")
     self._current_channel = None
     self.programs.clear()
