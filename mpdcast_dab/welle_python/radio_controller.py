@@ -34,6 +34,17 @@ class RadioController(RadioControllerInterface):
     self._current_channel = ''
     self.ensemble_label   = None
     self.datetime         = None
+
+    '''
+    event _cancel_delayed_unsubscribe will:
+     not be set (or cleared) when we wait for somebody to cancel a delayed unsubscribe
+     set when the unsubscribe
+      -shall be cancelled or
+      -there is no delayed unsubscribe pending
+     awaited to be set during a potential unsubscription cancel:
+     event set => the unsubscribe was cancelled, so dont reset
+     Timeout => unsubscribe was not cancelled, so reset (or dont in case someone did an immediate unsubscribe)
+    '''
     self._cancel_delayed_unsubscribe = asyncio.Event()
     self._cancel_delayed_unsubscribe.set()
 
