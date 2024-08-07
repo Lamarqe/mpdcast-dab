@@ -90,19 +90,19 @@ class RadioController(RadioControllerInterface):
 
   # returns handler in case the subscription suceeded, otherwise None
   async def subscribe_program(self, channel, program_name):
-    # first check, if there is a delayed un-subscription pending
-    if not self._cancel_delayed_unsubscribe.is_set():
-      # we have an active subscription, but no subscribers.
-      # check if we can reuse the subscription
-      if self._current_channel == channel:
-        # yes, we can. So notify to cancel the unsubscribe
-        self._cancel_delayed_unsubscribe.set()
-      else:
-        # no, we cant. Trigger the delayed unsubscribe to happen immediately
-        async with self._subscription_lock:
-          await self._reset_channel()
-    # now we do the actual subscribe job
     async with self._subscription_lock:
+      # first check, if there is a delayed un-subscription pending
+      if not self._cancel_delayed_unsubscribe.is_set():
+        # we have an active subscription, but no subscribers.
+        # check if we can reuse the subscription
+        if self._current_channel == channel:
+          # yes, we can. So notify to cancel the unsubscribe
+          self._cancel_delayed_unsubscribe.set()
+        else:
+          # no, we cant. Trigger the delayed unsubscribe to happen immediately
+          await self._reset_channel()
+
+      # now we do the actual subscribe job
       # Block actions in case there is another channel active
       if self._current_channel and self._current_channel != channel:
         logger.warning('there is another channel active')
@@ -131,13 +131,13 @@ class RadioController(RadioControllerInterface):
       # In these cases, we need to reset the c lib to get back to an idle state.
       except (asyncio.exceptions.CancelledError,
             ConnectionResetError):
-        await self._reset_if_no_handler()
+        asyncio.get_running_loop().create_task(self._reset_if_no_handler())
         # re-throw the exception so the caller can also do its cleanup
         raise
 
       # The program is not part of the channel
       if not program_pid:
-        await self._reset_if_no_handler()
+        asyncio.get_running_loop().create_task(self._reset_if_no_handler())
         logger.error('The program %s is not part of the channel %s', program_name, channel)
         return None
 
@@ -149,7 +149,7 @@ class RadioController(RadioControllerInterface):
         programme_handler = WavProgrammeHandler()
         self._programme_handlers[program_pid] = programme_handler
         if not self._dab_device.subscribe_program(programme_handler, program_pid):
-          await self._reset_if_no_handler()
+          asyncio.get_running_loop().create_task(self._reset_if_no_handler())
           logger.error('Subscription to selected program failed')
           return None
 
