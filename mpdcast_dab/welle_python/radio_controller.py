@@ -94,7 +94,8 @@ class RadioController(RadioControllerInterface):
   # returns handler in case the subscription suceeded, otherwise None
   async def subscribe_program(self, channel, program_name):
     async with self._subscription_lock:
-      await self._tune_channel(channel)
+      if not await self._tune_channel(channel):
+        return None
       return await self._subscribe_for_service_in_current_channel(program_name)
 
   async def _tune_channel(self, channel):
@@ -106,27 +107,28 @@ class RadioController(RadioControllerInterface):
         self._cancel_delayed_channel_reset.set()
       else:
         # no, we cant. reset channel immediately, so we can select a new one afterwards
+        # TODO: HANDLE CancelledError AND ConnectionResetError
         await self._reset_channel()
 
-    # now do the actual subscription task
-    # Block actions in case there is another channel active
-    if self._channel.name and self._channel.name != channel:
-      logger.warning('there is another channel active')
-      return None
-
+    # If there is a channel active, check if its the correct one
+    if self._channel.name:
+      if self._channel.name != channel:
+        logger.warning('there is another channel active')
+        return False
+      else:
+        return True
     # If There is no active channel, tune the device to the channel
-    if not self._channel.name:
+    else:
       if not self._dab_device.aquire_now(self):
         logger.warning('DAB device is locked. No playback possible.')
-        return None
-
-      tune_okay = self._dab_device.set_channel(channel)
-      if tune_okay:
+        return False
+      if not self._dab_device.set_channel(channel):
         self._channel.name = channel
-      else:
         print("could not start device, fatal")
         self._dab_device.release()
-        return None
+        return False
+      # success!
+      return True    
 
   async def _subscribe_for_service_in_current_channel(self, program_name):
     # Wait for the selected program to appear in the channel
