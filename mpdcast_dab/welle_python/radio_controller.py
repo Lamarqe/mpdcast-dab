@@ -94,11 +94,11 @@ class RadioController(RadioControllerInterface):
   # returns handler in case the subscription suceeded, otherwise None
   async def subscribe_program(self, channel, program_name):
     async with self._subscription_lock:
-      if not await self._tune_channel(channel):
+      if not self._tune_channel(channel):
         return None
       return await self._subscribe_for_service_in_current_channel(program_name)
 
-  async def _tune_channel(self, channel):
+  def _tune_channel(self, channel):
     # first check, if there is a delayed channel reset pending
     if not self._cancel_delayed_channel_reset.is_set():
       # we have an active channel, check if we can reuse it
@@ -107,28 +107,26 @@ class RadioController(RadioControllerInterface):
         self._cancel_delayed_channel_reset.set()
       else:
         # no, we cant. reset channel immediately, so we can select a new one afterwards
-        # TODO: HANDLE CancelledError AND ConnectionResetError
-        await self._reset_channel()
+        self._reset_channel()
 
     # If there is a channel active, check if its the correct one
     if self._channel.name:
       if self._channel.name != channel:
         logger.warning('there is another channel active')
         return False
-      else:
-        return True
-    # If There is no active channel, tune the device to the channel
-    else:
-      if not self._dab_device.aquire_now(self):
-        logger.warning('DAB device is locked. No playback possible.')
-        return False
-      if not self._dab_device.set_channel(channel):
-        self._channel.name = channel
-        print("could not start device, fatal")
-        self._dab_device.release()
-        return False
-      # success!
-      return True    
+      # nothing to do for us here
+      return True
+    # There is no active channel. tune the device to the channel
+    if not self._dab_device.aquire_now(self):
+      logger.error('DAB device is locked. No playback possible.')
+      return False
+    if not self._dab_device.set_channel(channel):
+      logger.error("could not set the device channel.")
+      self._dab_device.release()
+      return False
+    # success!
+    self._channel.name = channel
+    return True
 
   async def _subscribe_for_service_in_current_channel(self, program_name):
     # Wait for the selected program to appear in the channel
@@ -209,9 +207,9 @@ class RadioController(RadioControllerInterface):
       async with self._subscription_lock:
         # before resetting, check if our job is still valid (nobody the resetted the channel in the meantime)
         if self._channel.name and self._channel.name == reset_target_channel:
-          await self._reset_channel()
+          self._reset_channel()
 
-  async def _reset_channel(self):
+  def _reset_channel(self):
     self._dab_device.set_channel("")
     self._channel.name = None
     self._programs.clear()
