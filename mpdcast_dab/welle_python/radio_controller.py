@@ -102,12 +102,11 @@ class RadioController(RadioControllerInterface):
     # first check, if there is a delayed channel reset pending
     if not self._cancel_delayed_channel_reset.is_set():
       # we have an active channel, check if we can reuse it
-      if self._channel.name == channel:
-        # yes, we can. So notify to cancel the reset
-        self._cancel_delayed_channel_reset.set()
-      else:
+      if self._channel.name != channel:
         # no, we cant. reset channel immediately, so we can select a new one afterwards
         self._reset_channel()
+      # we either reuse the channel or we resetted it. In both cases: Canncel the delayed reset
+      self._cancel_delayed_channel_reset.set()
 
     # If there is a channel active, check if its the correct one
     if self._channel.name:
