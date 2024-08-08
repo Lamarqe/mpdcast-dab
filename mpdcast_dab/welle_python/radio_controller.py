@@ -17,23 +17,28 @@
 import asyncio
 import datetime
 import logging
+import dataclasses
 from mpdcast_dab.welle_python.wav_programme_handler import WavProgrammeHandler
 from mpdcast_dab.welle_python.dab_callbacks import RadioControllerInterface
 
 logger = logging.getLogger(__name__)
 
 class RadioController(RadioControllerInterface):
+  @dataclasses.dataclass
+  class ChannelData():
+    def __init__(self):
+      self.name           = ''
+      self.ensemble_label = None
+      self.datetime       = None
+
   PROGRAM_DISCOVERY_TIMEOUT = 10
   CHANNEL_RESET_DELAY       = 5
 
   def __init__(self, device):
-    self._dab_device = device
-    self.programs            = {}
+    self._dab_device         = device
+    self._programs           = {}
     self._programme_handlers = {}
-
-    self._current_channel = ''
-    self.ensemble_label   = None
-    self.datetime         = None
+    self._channel            = self.ChannelData()
 
     '''
     event _cancel_delayed_channel_reset will:
@@ -52,20 +57,20 @@ class RadioController(RadioControllerInterface):
     self._subscription_lock = asyncio.Lock()
 
   async def on_service_detected(self, service_id):
-    if not service_id in self.programs:
-      self.programs[service_id] = None
+    if not service_id in self._programs:
+      self._programs[service_id] = None
 
   async def on_set_ensemble_label(self, label):
-    self.ensemble_label = label
+    self._channel.ensemble_label = label
 
   async def on_datetime_update(self, timestamp):
-    self.datetime = datetime.datetime.fromtimestamp(timestamp)
+    self._channel.datetime = datetime.datetime.fromtimestamp(timestamp)
 
   def _get_program_id(self, lookup_name):
-    for service_id, program_name in self.programs.items():
+    for service_id, program_name in self._programs.items():
       if not program_name or len(program_name) == 0:
-        self.programs[service_id] = self._dab_device.get_service_name(service_id).rstrip()
-      if self.programs[service_id] == lookup_name:
+        self._programs[service_id] = self._dab_device.get_service_name(service_id).rstrip()
+      if self._programs[service_id] == lookup_name:
         return service_id
     # Not found
     return None
@@ -94,7 +99,7 @@ class RadioController(RadioControllerInterface):
       # first check, if there is a delayed channel reset pending
       if not self._cancel_delayed_channel_reset.is_set():
         # we have an active channel, check if we can reuse it
-        if self._current_channel == channel:
+        if self._channel.name == channel:
           # yes, we can. So notify to cancel the reset
           self._cancel_delayed_channel_reset.set()
         else:
@@ -103,19 +108,19 @@ class RadioController(RadioControllerInterface):
 
       # now do the actual subscription task
       # Block actions in case there is another channel active
-      if self._current_channel and self._current_channel != channel:
+      if self._channel.name and self._channel.name != channel:
         logger.warning('there is another channel active')
         return None
 
       # If There is no active channel, tune the device to the channel
-      if not self._current_channel:
+      if not self._channel.name:
         if not self._dab_device.aquire_now(self):
           logger.warning('DAB device is locked. No playback possible.')
           return None
 
         tune_okay = self._dab_device.set_channel(channel)
         if tune_okay:
-          self._current_channel = channel
+          self._channel.name = channel
         else:
           print("could not start device, fatal")
           self._dab_device.release()
@@ -189,7 +194,7 @@ class RadioController(RadioControllerInterface):
     if self._programme_handlers:
       return
     # wait to see if someone wants to reuse the tuned channel
-    reset_target_channel = self._current_channel
+    reset_target_channel = self._channel.name
     try:
       self._cancel_delayed_channel_reset.clear()
       await asyncio.wait_for(self._cancel_delayed_channel_reset.wait(), RadioController.CHANNEL_RESET_DELAY)
@@ -199,13 +204,13 @@ class RadioController(RadioControllerInterface):
       # timeout passed without somebody cancelling the channel reset
       async with self._subscription_lock:
         # before resetting, check if our job is still valid (nobody the resetted the channel in the meantime)
-        if self._current_channel and self._current_channel == reset_target_channel:
+        if self._channel.name and self._channel.name == reset_target_channel:
           await self._reset_channel()
 
   async def _reset_channel(self):
     self._dab_device.set_channel("")
-    self._current_channel = None
-    self.programs.clear()
+    self._channel.name = None
+    self._programs.clear()
     self._dab_device.release()
 
   async def unsubscribe_all_programs(self):
@@ -215,4 +220,4 @@ class RadioController(RadioControllerInterface):
         await self._unsubscribe(program_pid)
 
   def get_current_channel(self):
-    return self._current_channel
+    return self._channel.name
