@@ -75,7 +75,6 @@ class RadioController(RadioControllerInterface):
     # Not found
     return None
 
-
   async def _wait_for_channel(self, program_name):
     # initial check, as we might already have an active subscription for the program
     program_pid = self._get_program_id(program_name)
@@ -91,7 +90,6 @@ class RadioController(RadioControllerInterface):
         return program_pid
     # Not found
     return None
-
 
   # returns handler in case the subscription suceeded, otherwise None
   async def subscribe_program(self, channel, program_name):

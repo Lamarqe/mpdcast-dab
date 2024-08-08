@@ -54,7 +54,7 @@ def update_logger_config(verbose):
 
 def get_args():
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent',
-	                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument('-p', '--port', help= 'Communication port to use.', type=int, default=8864)
   parser.add_argument('-c', '--conf', help= 'MPD config file to use.', default='/etc/mpd.conf')
   parser.add_argument('--disable-dabserver', help= 'Disable DAB server functionality', action='store_true')
