@@ -94,72 +94,76 @@ class RadioController(RadioControllerInterface):
   # returns handler in case the subscription suceeded, otherwise None
   async def subscribe_program(self, channel, program_name):
     async with self._subscription_lock:
-      # first check, if there is a delayed channel reset pending
-      if not self._cancel_delayed_channel_reset.is_set():
-        # we have an active channel, check if we can reuse it
-        if self._channel.name == channel:
-          # yes, we can. So notify to cancel the reset
-          self._cancel_delayed_channel_reset.set()
-        else:
-          # no, we cant. reset channel immediately, so we can select a new one afterwards
-          await self._reset_channel()
+      await self._tune_channel(channel)
+      return await self._subscribe_for_service_in_current_channel(program_name)
 
-      # now do the actual subscription task
-      # Block actions in case there is another channel active
-      if self._channel.name and self._channel.name != channel:
-        logger.warning('there is another channel active')
-        return None
-
-      # If There is no active channel, tune the device to the channel
-      if not self._channel.name:
-        if not self._dab_device.aquire_now(self):
-          logger.warning('DAB device is locked. No playback possible.')
-          return None
-
-        tune_okay = self._dab_device.set_channel(channel)
-        if tune_okay:
-          self._channel.name = channel
-        else:
-          print("could not start device, fatal")
-          self._dab_device.release()
-          return None
-
-      # Wait for the selected program to appear in the channel
-      try:
-        program_pid = await self._wait_for_channel(program_name)
-
-      # Because the user might cancel the subscription request while waiting,
-      # we need to check for CancelledError and ConnectionResetError.
-      # In these cases, we need to reset the c lib to get back to an idle state.
-      except (asyncio.exceptions.CancelledError,
-            ConnectionResetError):
-        asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
-        # re-throw the exception so the caller can also do its cleanup
-        raise
-
-      # The program is not part of the channel
-      if not program_pid:
-        asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
-        logger.error('The program %s is not part of the channel %s', program_name, channel)
-        return None
-
-      # the program exists in the channel. Check if there is already an active subscription
-      if program_pid in self._programme_handlers:
-        programme_handler = self._programme_handlers[program_pid]
+  async def _tune_channel(self, channel):
+    # first check, if there is a delayed channel reset pending
+    if not self._cancel_delayed_channel_reset.is_set():
+      # we have an active channel, check if we can reuse it
+      if self._channel.name == channel:
+        # yes, we can. So notify to cancel the reset
+        self._cancel_delayed_channel_reset.set()
       else:
-        # First time subscription to the channel. Set up the handler and register it.
-        programme_handler = WavProgrammeHandler()
-        self._programme_handlers[program_pid] = programme_handler
-        if not self._dab_device.subscribe_program(programme_handler, program_pid):
-          asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
-          logger.error('Subscription to selected program failed')
-          return None
+        # no, we cant. reset channel immediately, so we can select a new one afterwards
+        await self._reset_channel()
 
-      # increase the counter of active subscriptions for the selected program
-      programme_handler.subscribers += 1
-      logger.debug('subscribers: %d', programme_handler.subscribers)
-      return programme_handler
+    # now do the actual subscription task
+    # Block actions in case there is another channel active
+    if self._channel.name and self._channel.name != channel:
+      logger.warning('there is another channel active')
+      return None
 
+    # If There is no active channel, tune the device to the channel
+    if not self._channel.name:
+      if not self._dab_device.aquire_now(self):
+        logger.warning('DAB device is locked. No playback possible.')
+        return None
+
+      tune_okay = self._dab_device.set_channel(channel)
+      if tune_okay:
+        self._channel.name = channel
+      else:
+        print("could not start device, fatal")
+        self._dab_device.release()
+        return None
+
+  async def _subscribe_for_service_in_current_channel(self, program_name):
+    # Wait for the selected program to appear in the channel
+    try:
+      program_pid = await self._wait_for_channel(program_name)
+
+    # Because the user might cancel the subscription request while waiting,
+    # we need to check for CancelledError and ConnectionResetError.
+    # In these cases, we need to reset the c lib to get back to an idle state.
+    except (asyncio.exceptions.CancelledError,
+          ConnectionResetError):
+      asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
+      # re-throw the exception so the caller can also do its cleanup
+      raise
+
+    # The program is not part of the channel
+    if not program_pid:
+      asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
+      logger.error('The program %s is not part of the channel %s', program_name, self._channel.name)
+      return None
+
+    # the program exists in the channel. Check if there is already an active subscription
+    if program_pid in self._programme_handlers:
+      programme_handler = self._programme_handlers[program_pid]
+    else:
+      # First time subscription to the channel. Set up the handler and register it.
+      programme_handler = WavProgrammeHandler()
+      self._programme_handlers[program_pid] = programme_handler
+      if not self._dab_device.subscribe_program(programme_handler, program_pid):
+        asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
+        logger.error('Subscription to selected program failed')
+        return None
+
+    # increase the counter of active subscriptions for the selected program
+    programme_handler.subscribers += 1
+    logger.debug('subscribers: %d', programme_handler.subscribers)
+    return programme_handler
 
   async def unsubscribe_program(self, program_name):
     async with self._subscription_lock:
