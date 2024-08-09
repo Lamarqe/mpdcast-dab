@@ -59,7 +59,7 @@ def get_args():
   parser.add_argument('-c', '--conf', help= 'MPD config file to use.', default='/etc/mpd.conf')
   parser.add_argument('--disable-dabserver', help= 'Disable DAB server functionality', action='store_true')
   parser.add_argument('--disable-mpdcast', help= 'Disable MPD Cast functionality', action='store_true')
-  parser.add_argument('--verbose', help= 'Enable verbose output', action='store_true')
+  parser.add_argument('-v', '--verbose', help= 'Enable verbose output', action='store_true')
   return vars(parser.parse_args())
 
 

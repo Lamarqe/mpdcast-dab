@@ -96,9 +96,6 @@ class WavProgrammeHandler(ProgrammeHandlerInterface):
 
   async def on_new_audio(self, audio_data, sample_rate, mode):
     self.data.sample_rate = sample_rate
-    await self.buffer_audio(audio_data)
-
-  async def buffer_audio(self, audio_data):
     async with self._audio_buffer.data_lock:
       self._audio_buffer.data[self._audio_buffer.next_frame] = audio_data
       self._audio_buffer.next_frame = (self._audio_buffer.next_frame+1) % WavProgrammeHandler.AudioBuffer.BUFFER_SIZE
@@ -108,13 +105,13 @@ class WavProgrammeHandler(ProgrammeHandlerInterface):
 
   async def on_new_dynamic_label(self, label):
     self.data.label = label
-    await self._set_event(self._events.label)
-
-  async def _set_event(self, event):
     if not self._delete_in_progress:
-      event.set()
-      event.clear()
+      self._events.label.set()
+      self._events.label.clear()
 
   async def on_mot(self, data, mime_type, name):
     self.data.picture = {'type': mime_type, 'data': data, 'name': name}
-    await self._set_event(self._events.picture)
+    if not self._delete_in_progress:
+      self._events.picture.set()
+      self._events.picture.clear()
+

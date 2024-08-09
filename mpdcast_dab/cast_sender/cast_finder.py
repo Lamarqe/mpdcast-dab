@@ -21,14 +21,14 @@ import pychromecast
 class CastFinder(pychromecast.discovery.AbstractCastListener):
   def __init__(self, device_name):
     self._device_name = device_name
-    self.device = None
+    self._device = None
     self._browser = None
-    self._my_task = None
+    self._discovery_done_event = asyncio.Event()
 
   def add_cast(self, uuid, _service):
     if self._device_name == self._browser.services[uuid].friendly_name:
-      self.device = self._browser.services[uuid]
-      self._my_task.set()
+      self._device = self._browser.services[uuid]
+      self._discovery_done_event.set()
 
   def remove_cast(self, uuid, _service, cast_info):
     pass
@@ -36,12 +36,14 @@ class CastFinder(pychromecast.discovery.AbstractCastListener):
   def update_cast(self, uuid, _service):
     pass
 
-  async def do_discovery (self):
+  async def find_device (self):
+    self._device = None
+    self._discovery_done_event.clear()
     self._browser = pychromecast.discovery.CastBrowser(self, zeroconf.Zeroconf(), None)
-    self._my_task = asyncio.Event()
     self._browser.start_discovery()
-    await self._my_task.wait()
+    await self._discovery_done_event.wait()
     self._browser.stop_discovery()
+    return self._device
 
   def cancel(self):
-    self._my_task.set()
+    self._discovery_done_event.set()

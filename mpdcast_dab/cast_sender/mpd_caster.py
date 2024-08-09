@@ -181,12 +181,12 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
   async def waitfor_and_register_castdevice(self, cast_finder):
     if not self._cast.chromecast:
-      await cast_finder.do_discovery()
-      if cast_finder.device:
+      cast_device = await cast_finder.find_device()
+      if cast_device:
         loop = asyncio.get_running_loop()
         self._cast.chromecast = await loop.run_in_executor(None,
                                                            pychromecast.get_chromecast_from_cast_info,
-                                                           cast_finder.device,
+                                                           cast_device,
                                                            self._cast.zconf)
         await loop.run_in_executor(None, self._cast.chromecast.wait)
         if self._cast.chromecast.app_id != pychromecast.IDLE_APP_ID:

@@ -84,10 +84,6 @@ class DabScanner(RadioControllerInterface):
       self._scanner_task.cancel()
     return { }
 
-  async def wait_for_scan_complete(self):
-    if self._scanner_task:
-      await self._scanner_task
-
   async def _run_scan(self):
     service_count = 0
     try:

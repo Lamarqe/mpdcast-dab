@@ -81,7 +81,7 @@ class DabServer():
 
 
   # is_float should only be true if the audio data is in 32-bit floating-point format.
-  def wav_header(self, is_float, channels, bit_rate, sample_rate):
+  def _wav_header(self, is_float, channels, bit_rate, sample_rate):
     bo = 'little'
     enc = 'ascii'
     # RIFF header
@@ -190,7 +190,7 @@ class DabServer():
 
       # prepend the wav header to the initial response
       next_audio_frame, audio = await handler.new_audio()
-      header = self.wav_header(False, 2, 16, handler.data.sample_rate)
+      header = self._wav_header(False, 2, 16, handler.data.sample_rate)
       await response.write(header + audio)
 
       while True:
