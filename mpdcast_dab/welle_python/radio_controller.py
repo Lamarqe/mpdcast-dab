@@ -50,6 +50,7 @@ class RadioController(RadioControllerInterface):
      event set => the channel reset was cancelled, so dont reset
      Timeout => channel reset was not cancelled, so reset (or dont in case someone did an immediate reset)
     '''
+    self._channel_reset_task           = None
     self._cancel_delayed_channel_reset = asyncio.Event()
     self._cancel_delayed_channel_reset.set()
 
@@ -137,13 +138,13 @@ class RadioController(RadioControllerInterface):
     # In these cases, we need to reset the c lib to get back to an idle state.
     except (asyncio.exceptions.CancelledError,
           ConnectionResetError):
-      asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
+      self._start_delayed_reset()
       # re-throw the exception so the caller can also do its cleanup
       raise
 
     # The program is not part of the channel
     if not program_pid:
-      asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
+      self._start_delayed_reset()
       logger.error('The program %s is not part of the channel %s', program_name, self._channel.name)
       return None
 
@@ -155,7 +156,7 @@ class RadioController(RadioControllerInterface):
       programme_handler = WavProgrammeHandler()
       self._programme_handlers[program_pid] = programme_handler
       if not self._dab_device.subscribe_program(programme_handler, program_pid):
-        asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
+        self._start_delayed_reset()
         logger.error('Subscription to selected program failed')
         return None
 
@@ -189,10 +190,17 @@ class RadioController(RadioControllerInterface):
       self._dab_device.unsubscribe_program(program_pid)
       self._programme_handlers[program_pid].release_waiters()
       del self._programme_handlers[program_pid]
-      asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
+      self._start_delayed_reset()
+
+  def _start_delayed_reset(self):
+    def remove_ref(task):
+      self._channel_reset_task = None
+    self._channel_reset_task = asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
+    self._channel_reset_task.add_done_callback(remove_ref)
 
   async def _reset_later_if_no_handler(self):
     if self._programme_handlers:
+      self._channel_reset_task = None
       return
     # wait to see if someone wants to reuse the tuned channel
     reset_target_channel = self._channel.name
@@ -200,6 +208,7 @@ class RadioController(RadioControllerInterface):
       self._cancel_delayed_channel_reset.clear()
       await asyncio.wait_for(self._cancel_delayed_channel_reset.wait(), RadioController.CHANNEL_RESET_DELAY)
       # as the channel will be reused, dont reset
+      self._channel_reset_task = None
       return
     except TimeoutError:
       # timeout passed without somebody cancelling the channel reset
@@ -207,6 +216,7 @@ class RadioController(RadioControllerInterface):
         # before resetting, check if our job is still valid (nobody the resetted the channel in the meantime)
         if self._channel.name and self._channel.name == reset_target_channel:
           self._reset_channel()
+    self._channel_reset_task = None
 
   def _reset_channel(self):
     self._dab_device.set_channel("")
@@ -214,11 +224,14 @@ class RadioController(RadioControllerInterface):
     self._programs.clear()
     self._dab_device.release()
 
-  async def unsubscribe_all_programs(self):
+  async def stop(self):
     async with self._subscription_lock:
       active_pids = list(self._programme_handlers.keys())
       for program_pid in active_pids:
         await self._unsubscribe(program_pid)
+    if self._channel_reset_task:
+      self._channel_reset_task.cancel()
+      self._reset_channel()
 
   def get_current_channel(self):
     return self._channel.name
