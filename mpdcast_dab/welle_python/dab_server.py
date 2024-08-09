@@ -77,6 +77,7 @@ class DabServer():
   async def stop(self):
     self._shutdown_in_progress = True
     await self.radio_controller.stop()
+    await self.scanner.stop()
 
 
   # is_float should only be true if the audio data is in 32-bit floating-point format.

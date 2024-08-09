@@ -131,3 +131,11 @@ class DabScanner(RadioControllerInterface):
     self._is_signal = is_signal
     self._signal_presence_event.set()
     self._signal_presence_event.clear()
+
+  async def stop(self):
+    if self._scanner_task:
+      self._scanner_task.cancel()
+      try:
+        await self._scanner_task
+      except asyncio.CancelledError:
+        pass
