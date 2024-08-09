@@ -114,4 +114,3 @@ class WavProgrammeHandler(ProgrammeHandlerInterface):
     if not self._delete_in_progress:
       self._events.picture.set()
       self._events.picture.clear()
-
