@@ -28,21 +28,21 @@ logger = logging.getLogger(__name__)
 class DabServer():
 
   def __init__(self, my_ip, port):
-    self.my_ip = my_ip
-    self.port = port
-    self.radio_controller = None
-    self.scanner = None
-    self._shutdown_in_progress = False
     welle_io = __import__('mpdcast_dab.welle_python.welle_io').welle_python.welle_io
-    self.dab_device = welle_io.DabDevice('auto')
+    self._my_ip                = my_ip
+    self._port                 = port
+    self._controller           = None
+    self._scanner              = None
+    self._shutdown_in_progress = False
+    self.dab_device            = welle_io.DabDevice('auto')
 
   def initialize(self):
     if not self.dab_device.initialize():
       logger.warning('No DAB device available. DAB server will be disabled.')
       return False
 
-    self.radio_controller = RadioController(self.dab_device)
-    self.scanner = DabScanner(self.dab_device)
+    self._controller = RadioController(self.dab_device)
+    self._scanner = DabScanner(self.dab_device)
     return True
 
   def get_routes(self):
@@ -58,25 +58,25 @@ class DabServer():
             web.get(r'/label/next/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_next_label)]
 
   async def get_scanner_playlist(self, request):
-    resp = self.scanner.get_playlist(self.my_ip, self.port)
+    resp = self._scanner.get_playlist(self._my_ip, self._port)
     return web.Response(body = resp, content_type = 'audio/x-mpegurl')
 
   async def start_scan(self, request):
-    resp = await self.scanner.start_scan()
+    resp = await self._scanner.start_scan()
     return web.Response(body = json.dumps(resp), content_type = 'application/json')
 
   async def stop_scan(self, request):
-    resp = self.scanner.stop_scan()
+    resp = self._scanner.stop_scan()
     return web.Response(body = json.dumps(resp), content_type = 'application/json')
 
   async def get_scanner_details(self, request):
-    resp = self.scanner.status()
+    resp = self._scanner.status()
     return web.Response(body = json.dumps(resp), content_type = 'application/json')
 
   async def stop(self):
     self._shutdown_in_progress = True
-    self.radio_controller.stop()
-    await self.scanner.stop()
+    self._controller.stop()
+    await self._scanner.stop()
 
 
   # is_float should only be true if the audio data is in 32-bit floating-point format.
@@ -106,7 +106,7 @@ class DabServer():
     channel = request.match_info['channel']
     program = request.match_info['program']
     logger.debug('get_next_image: channel: %s program: %s', channel, program)
-    handler = self.radio_controller.get_handler(program)
+    handler = self._controller.get_handler(program)
     if handler:
       try:
         image = await handler.new_picture()
@@ -123,7 +123,7 @@ class DabServer():
     channel = request.match_info['channel']
     program = request.match_info['program']
     logger.debug('get_next_label: channel: %s program: %s', channel, program)
-    handler = self.radio_controller.get_handler(program)
+    handler = self._controller.get_handler(program)
     if handler:
       try:
         label = await handler.new_label()
@@ -139,7 +139,7 @@ class DabServer():
     channel = request.match_info['channel']
     program = request.match_info['program']
     logger.debug('get_current_image: channel: %s program: %s', channel, program)
-    handler = self.radio_controller.get_handler(program)
+    handler = self._controller.get_handler(program)
     if (handler and len(handler.data.picture['data']) > 0):
       return web.Response(body = handler.data.picture['data'],
                           content_type = handler.data.picture['type'],
@@ -152,7 +152,7 @@ class DabServer():
     channel = request.match_info['channel']
     program = request.match_info['program']
     logger.debug('get_current_label: channel: %s program: %s', channel, program)
-    handler = self.radio_controller.get_handler(program)
+    handler = self._controller.get_handler(program)
     if handler:
       return web.Response(text=handler.data.label,
                           headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
@@ -171,13 +171,13 @@ class DabServer():
     logger.info('new audio request for %s', program)
 
     # Check if the device is busy with streaming another channel
-    if not self.radio_controller.can_subscribe(channel):
+    if not self._controller.can_subscribe(channel):
       # This might be a program switch with the new subscription request coming faster then the unsubscribe.
       # So we wait for half a second and continue with the request processing
       # In case of a switch, the unsubscribe will have been processed until then
       await asyncio.sleep(0.5)
 
-    handler = await self.radio_controller.subscribe_program(channel, program)
+    handler = await self._controller.subscribe_program(channel, program)
     if not handler:
       raise web.HTTPServiceUnavailable()
 
@@ -198,12 +198,11 @@ class DabServer():
       while True:
         next_audio_frame, audio = await handler.new_audio(next_audio_frame)
         await response.write(audio)
-#        await asyncio.sleep(0.1)  # consider using this for performance gains
     except (asyncio.exceptions.CancelledError,
             asyncio.exceptions.TimeoutError,
             ConnectionResetError):
       # user cancelled the stream, so unsubscribe
-      self.radio_controller.unsubscribe_program(program)
+      self._controller.unsubscribe_program(program)
       return response
     except UnsubscribedError:
       return response
