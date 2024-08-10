@@ -95,6 +95,7 @@ class RadioController(RadioControllerInterface):
         self._reset_channel()
       # we either reuse the channel or we resetted it. In both cases: Cancel the delayed reset
       self._channel_reset_task.cancel()
+      self._channel_reset_task = None
 
     # If there is a channel active, check if its the correct one
     if self._channel.name:
@@ -205,11 +206,15 @@ class RadioController(RadioControllerInterface):
     async with self._subscription_lock:
       active_sids = list(self._programme_handlers.keys())
       for service_id in active_sids:
-        await self._unsubscribe(service_id)
-    # cancel a pending reset and reset immediately
-    if self._channel_reset_task:
-      self._channel_reset_task.cancel()
-      self._reset_channel()
+        self._unsubscribe(service_id)
+      # cancel a pending reset and reset immediately
+      if self._channel_reset_task:
+        self._channel_reset_task.cancel()
+        try:
+          await self._channel_reset_task
+        except asyncio.CancelledError:
+          self._channel_reset_task = None
+        self._reset_channel()
 
   def can_subscribe(self, new_channel):
     return (not self._channel.name or            # either there is no active channel
