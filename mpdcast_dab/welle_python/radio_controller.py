@@ -183,17 +183,13 @@ class RadioController(RadioControllerInterface):
     # nothing to do if there is still at least one programme subscription
     if self._programme_handlers:
       return
-    def remove_ref(task):
-      self._channel_reset_task = None
     self._channel_reset_task = asyncio.get_running_loop().create_task(self._reset_channel_later())
-    # clean up reference to the reset as soon as it is complete or got cancelled
-    self._channel_reset_task.add_done_callback(remove_ref)
 
   async def _reset_channel_later(self):
     await asyncio.sleep(RadioController.CHANNEL_RESET_DELAY)
     # the reset job did not get cancelled. So do it now
     self._reset_channel()
-    # no need to clean up reference. Will be done by done_callback
+    self._channel_reset_task = None
 
   def _reset_channel(self):
     assert bool(not self._programme_handlers)
