@@ -90,11 +90,10 @@ class MpdConfig():
 
 
 @dataclasses.dataclass
-class CastData():
-  def __init__(self, title = None, artist = None, image_url = None):
-    self.title     = title
-    self.artist    = artist
-    self.image_url = image_url
+class CastData:
+  title:     str = None
+  artist:    str = None
+  image_url: str = None
 
 class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
                 pychromecast.socket_client.ConnectionStatusListener,
@@ -108,30 +107,26 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
   cast_forever returns as soon as the connection to the mpdclient instance is lost
   """
 
+  @dataclasses.dataclass
+  class CastStatus:
+    controller:   LocalMediaPlayerController                 = None
+    chromecast:   pychromecast.Chromecast                    = None
+    media_status: pychromecast.controllers.media.MediaStatus = None
+    media_event:  asyncio.Event                              = asyncio.Event()
+    receiver_url: URL                                        = None
+    zconf:        zeroconf.Zeroconf                          = zeroconf.Zeroconf()
 
   @dataclasses.dataclass
-  class CastStatus():
-    def __init__(self):
-      self.controller   = None
-      self.chromecast   = None
-      self.media_status = None
-      self.media_event  = asyncio.Event()
-      self.receiver_url = None
-      self.zconf        = zeroconf.Zeroconf()
+  class MpdStatus:
+    config:      MpdConfig             = None
+    image_cache: ImageRequestHandler   = None
+    client:      mpd.asyncio.MPDClient = None
 
   @dataclasses.dataclass
-  class MpdStatus():
-    def __init__(self):
-      self.config      = None
-      self.image_cache = None
-      self.client      = None
-
-  @dataclasses.dataclass
-  class UpdateTasks():
-    def __init__(self):
-      self.tvh_show  = None
-      self.dab_label = None
-      self.dab_image = None
+  class UpdateTasks:
+    tvh_show:  asyncio.Task = None
+    dab_label: asyncio.Task = None
+    dab_image: asyncio.Task = None
 
   def __init__(self, config_filename, my_ip, port):
     self._mpd             = self.MpdStatus()
@@ -216,6 +211,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     # initiate the cast
     self._cast.chromecast.wait()
     cast_url = URL.build(scheme = 'http', host = self._cast.receiver_url.host, port = self._mpd.config.streaming_port)
+    # cast_url = 'http://192.168.2.21/hlstest/playlist.m3u8'
     self._cast.controller.play_media(str(cast_url), **args)
     await self._cast.media_event.wait()
     self._cast.media_event.clear()
