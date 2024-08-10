@@ -233,5 +233,7 @@ class RadioController(RadioControllerInterface):
       self._channel_reset_task.cancel()
       self._reset_channel()
 
-  def get_current_channel(self):
-    return self._channel.name
+  def can_subscribe(self, new_channel):
+    return (not self._channel.name or                        # either there is no active channel
+            self._channel.name == new_channel or             # OR target and current channel are the same
+            not self._cancel_delayed_channel_reset.is_set()) # OR a delayed reset is pending

@@ -168,7 +168,7 @@ class DabServer():
     logger.info('new audio request for %s', program)
 
     # Check if the device is busy with streaming another channel
-    if self.radio_controller.get_current_channel() and self.radio_controller.get_current_channel() != channel:
+    if not self.radio_controller.can_subscribe(channel):
       # This might be a program switch with the new subscription request coming faster then the unsubscribe.
       # So we wait for half a second and continue with the request processing
       # In case of a switch, the unsubscribe will have been processed until then
