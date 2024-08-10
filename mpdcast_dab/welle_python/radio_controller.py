@@ -196,6 +196,7 @@ class RadioController(RadioControllerInterface):
     # no need to clean up reference. Will be done by done_callback
 
   def _reset_channel(self):
+    assert bool(not self._programme_handlers)
     self._dab_device.set_channel("")
     self._channel.name = None
     self._programs.clear()
