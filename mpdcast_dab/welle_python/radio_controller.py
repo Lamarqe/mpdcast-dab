@@ -198,19 +198,15 @@ class RadioController(RadioControllerInterface):
     self._programs.clear()
     self._dab_device.release()
 
-  async def stop(self):
-    async with self._subscription_lock:
-      active_sids = list(self._programme_handlers.keys())
-      for service_id in active_sids:
-        self._unsubscribe(service_id)
-      # cancel a pending reset and reset immediately
-      if self._channel_reset_task:
-        self._channel_reset_task.cancel()
-        try:
-          await self._channel_reset_task
-        except asyncio.CancelledError:
-          self._channel_reset_task = None
-        self._reset_channel()
+  def stop(self):
+    active_sids = list(self._programme_handlers.keys())
+    for service_id in active_sids:
+      self._unsubscribe(service_id)
+    # cancel a pending reset and reset immediately
+    if self._channel_reset_task:
+      self._reset_channel()
+      self._channel_reset_task.cancel()
+      self._channel_reset_task = None
 
   def can_subscribe(self, new_channel):
     return (not self._channel.name or            # either there is no active channel

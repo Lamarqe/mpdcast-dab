@@ -75,7 +75,7 @@ class DabServer():
 
   async def stop(self):
     self._shutdown_in_progress = True
-    await self.radio_controller.stop()
+    self.radio_controller.stop()
     await self.scanner.stop()
 
 
