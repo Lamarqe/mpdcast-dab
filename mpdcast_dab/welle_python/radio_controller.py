@@ -125,13 +125,13 @@ class RadioController(RadioControllerInterface):
     # In these cases, we need to reset the c lib to get back to an idle state.
     except (asyncio.exceptions.CancelledError,
           ConnectionResetError):
-      self._update_channel()
+      self._cleanup_channel()
       # re-throw the exception so the caller can also do its cleanup
       raise
 
     # The program is not part of the channel
     if not program_pid:
-      self._update_channel()
+      self._cleanup_channel()
       logger.error('The program %s is not part of the channel %s', program_name, self._channel.name)
       return None
 
@@ -143,7 +143,7 @@ class RadioController(RadioControllerInterface):
       programme_handler = WavProgrammeHandler()
       self._programme_handlers[program_pid] = programme_handler
       if not self._dab_device.subscribe_program(programme_handler, program_pid):
-        self._update_channel()
+        self._cleanup_channel()
         logger.error('Subscription to selected program failed')
         return None
 
@@ -177,19 +177,19 @@ class RadioController(RadioControllerInterface):
       self._dab_device.unsubscribe_program(program_pid)
       self._programme_handlers[program_pid].release_waiters()
       del self._programme_handlers[program_pid]
-      self._update_channel()
+      self._cleanup_channel()
 
-  def _update_channel(self):
+  def _cleanup_channel(self):
     # nothing to do if there is still at least one programme subscription
     if self._programme_handlers:
       return
     def remove_ref(task):
       self._channel_reset_task = None
-    self._channel_reset_task = asyncio.get_running_loop().create_task(self._reset_later_if_no_handler())
+    self._channel_reset_task = asyncio.get_running_loop().create_task(self._reset_channel_later())
     # clean up reference to the reset as soon as it is complete or got cancelled
     self._channel_reset_task.add_done_callback(remove_ref)
 
-  async def _reset_later_if_no_handler(self):
+  async def _reset_channel_later(self):
     await asyncio.sleep(RadioController.CHANNEL_RESET_DELAY)
     # the reset job did not get cancelled. So do it now
     self._reset_channel()
