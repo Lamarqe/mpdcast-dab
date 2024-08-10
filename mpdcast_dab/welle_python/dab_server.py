@@ -32,7 +32,6 @@ class DabServer():
     self.port = port
     self.radio_controller = None
     self.scanner = None
-    self.handlers = {}
     self._shutdown_in_progress = False
     welle_io = __import__('mpdcast_dab.welle_python.welle_io').welle_python.welle_io
     self.dab_device = welle_io.DabDevice('auto')
@@ -107,9 +106,10 @@ class DabServer():
     channel = request.match_info['channel']
     program = request.match_info['program']
     logger.debug('get_next_image: channel: %s program: %s', channel, program)
-    if program in self.handlers:
+    handler = self.radio_controller.get_handler(program)
+    if handler:
       try:
-        image = await self.handlers[program].new_picture()
+        image = await handler.new_picture()
         return web.Response(body = image['data'],
                             content_type = image['type'],
                             headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
@@ -123,9 +123,10 @@ class DabServer():
     channel = request.match_info['channel']
     program = request.match_info['program']
     logger.debug('get_next_label: channel: %s program: %s', channel, program)
-    if program in self.handlers:
+    handler = self.radio_controller.get_handler(program)
+    if handler:
       try:
-        label = await self.handlers[program].new_label()
+        label = await handler.new_label()
         return web.Response(text=label,
                             headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
       except UnsubscribedError as exc:
@@ -138,9 +139,10 @@ class DabServer():
     channel = request.match_info['channel']
     program = request.match_info['program']
     logger.debug('get_current_image: channel: %s program: %s', channel, program)
-    if (program in self.handlers and len(self.handlers[program].data.picture['data']) > 0):
-      return web.Response(body = self.handlers[program].data.picture['data'],
-                          content_type = self.handlers[program].data.picture['type'],
+    handler = self.radio_controller.get_handler(program)
+    if (handler and len(handler.data.picture['data']) > 0):
+      return web.Response(body = handler.data.picture['data'],
+                          content_type = handler.data.picture['type'],
                           headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
     # no data found
     raise web.HTTPNotFound()
@@ -150,8 +152,9 @@ class DabServer():
     channel = request.match_info['channel']
     program = request.match_info['program']
     logger.debug('get_current_label: channel: %s program: %s', channel, program)
-    if program in self.handlers:
-      return web.Response(text=self.handlers[program].data.label,
+    handler = self.radio_controller.get_handler(program)
+    if handler:
+      return web.Response(text=handler.data.label,
                           headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
     # no data found
     raise web.HTTPNotFound()
@@ -180,7 +183,6 @@ class DabServer():
 
     # from here on, the device sends us the audio stream
     # send it via stream response until the user cancels it
-    self.handlers[program] = handler
     try:
       response = web.StreamResponse(
         status=200,
@@ -201,9 +203,7 @@ class DabServer():
             asyncio.exceptions.TimeoutError,
             ConnectionResetError):
       # user cancelled the stream, so unsubscribe
-      await self.radio_controller.unsubscribe_program(program)
-      if not self.radio_controller.is_playing(program):
-        del self.handlers[program]
+      self.radio_controller.unsubscribe_program(program)
       return response
     except UnsubscribedError:
       return response

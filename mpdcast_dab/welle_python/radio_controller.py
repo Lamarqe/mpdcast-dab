@@ -54,7 +54,7 @@ class RadioController(RadioControllerInterface):
   async def on_datetime_update(self, timestamp):
     self._channel.datetime = datetime.datetime.fromtimestamp(timestamp)
 
-  def _get_program_id(self, lookup_name):
+  def _fill_service_id(self, lookup_name):
     for service_id, program_name in self._programs.items():
       if not program_name or len(program_name) == 0:
         self._programs[service_id] = self._dab_device.get_service_name(service_id).rstrip()
@@ -65,17 +65,17 @@ class RadioController(RadioControllerInterface):
 
   async def _wait_for_channel(self, program_name):
     # initial check, as we might already have an active subscription for the program
-    program_pid = self._get_program_id(program_name)
-    if program_pid:
-      return program_pid
+    service_id = self._fill_service_id(program_name)
+    if service_id:
+      return service_id
 
     # wait the defined time for the program discovery
     # and check every 0.5 seconds if it was succesful
     for _ in range(2 * RadioController.PROGRAM_DISCOVERY_TIMEOUT):
       await asyncio.sleep(0.5)
-      program_pid = self._get_program_id(program_name)
-      if program_pid:
-        return program_pid
+      service_id = self._fill_service_id(program_name)
+      if service_id:
+        return service_id
     # Not found
     return None
 
@@ -118,7 +118,7 @@ class RadioController(RadioControllerInterface):
   async def _subscribe_for_service_in_current_channel(self, program_name):
     # Wait for the selected program to appear in the channel
     try:
-      program_pid = await self._wait_for_channel(program_name)
+      service_id = await self._wait_for_channel(program_name)
 
     # Because the user might cancel the subscription request while waiting,
     # we need to check for CancelledError and ConnectionResetError.
@@ -130,19 +130,19 @@ class RadioController(RadioControllerInterface):
       raise
 
     # The program is not part of the channel
-    if not program_pid:
+    if not service_id:
       self._cleanup_channel()
       logger.error('The program %s is not part of the channel %s', program_name, self._channel.name)
       return None
 
     # the program exists in the channel. Check if there is already an active subscription
-    if program_pid in self._programme_handlers:
-      programme_handler = self._programme_handlers[program_pid]
+    if service_id in self._programme_handlers:
+      programme_handler = self._programme_handlers[service_id]
     else:
       # First time subscription to the channel. Set up the handler and register it.
       programme_handler = WavProgrammeHandler()
-      self._programme_handlers[program_pid] = programme_handler
-      if not self._dab_device.subscribe_program(programme_handler, program_pid):
+      self._programme_handlers[service_id] = programme_handler
+      if not self._dab_device.subscribe_program(programme_handler, service_id):
         self._cleanup_channel()
         logger.error('Subscription to selected program failed')
         return None
@@ -152,31 +152,30 @@ class RadioController(RadioControllerInterface):
     logger.debug('subscribers: %d', programme_handler.subscribers)
     return programme_handler
 
-  async def unsubscribe_program(self, program_name):
-    async with self._subscription_lock:
-      program_pid = self._get_program_id(program_name)
-      if program_pid:
-        await self._unsubscribe(program_pid)
+  def unsubscribe_program(self, lookup_name):
+    for service_id, program_name in self._programs.items():
+      if program_name == lookup_name:
+        self._unsubscribe(service_id)
+        return
 
+  def get_handler(self, lookup_name):
+    for service_id, program_name in self._programs.items():
+      if program_name == lookup_name:
+        return self._programme_handlers.get(service_id)
+    # not subscribed
+    return None
 
-  def is_playing(self, program_name):
-    program_pid = self._get_program_id(program_name)
-    if not program_pid:
-      return False
-    return program_pid in self._programme_handlers
-
-
-  async def _unsubscribe(self, program_pid):
-    programme_handler = self._programme_handlers[program_pid]
+  def _unsubscribe(self, service_id):
+    programme_handler = self._programme_handlers[service_id]
     if not programme_handler:
       return
 
     programme_handler.subscribers -= 1
     logger.debug('subscribers: %d', programme_handler.subscribers)
     if programme_handler.subscribers == 0:
-      self._dab_device.unsubscribe_program(program_pid)
-      self._programme_handlers[program_pid].release_waiters()
-      del self._programme_handlers[program_pid]
+      self._dab_device.unsubscribe_program(service_id)
+      self._programme_handlers[service_id].release_waiters()
+      del self._programme_handlers[service_id]
       self._cleanup_channel()
 
   def _cleanup_channel(self):
@@ -204,9 +203,9 @@ class RadioController(RadioControllerInterface):
 
   async def stop(self):
     async with self._subscription_lock:
-      active_pids = list(self._programme_handlers.keys())
-      for program_pid in active_pids:
-        await self._unsubscribe(program_pid)
+      active_sids = list(self._programme_handlers.keys())
+      for service_id in active_sids:
+        await self._unsubscribe(service_id)
     # cancel a pending reset and reset immediately
     if self._channel_reset_task:
       self._channel_reset_task.cancel()
