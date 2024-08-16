@@ -32,16 +32,10 @@ if(PROFILING)
     add_definitions(-DWITH_PROFILING)
 endif()
 
-find_package(ALSA)
-if(ALSA_FOUND)
-    add_definitions(-DHAVE_ALSA)
-endif()
-
 find_package(FFTW3f REQUIRED)
-
-find_package (Python COMPONENTS Interpreter Development REQUIRED)
-find_package(Threads REQUIRED)
 find_package(Faad REQUIRED)
+find_package(Threads REQUIRED)
+find_package (Python COMPONENTS Interpreter Development REQUIRED)
 
 if (RTLSDR)
     find_package(LibRTLSDR REQUIRED)
