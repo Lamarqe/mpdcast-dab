@@ -211,7 +211,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     # initiate the cast
     self._cast.chromecast.wait()
     cast_url = URL.build(scheme = 'http', host = self._cast.receiver_url.host, port = self._mpd.config.streaming_port)
-    # cast_url = 'http://192.168.2.21/hlstest/playlist.m3u8'
     self._cast.controller.play_media(str(cast_url), **args)
     await self._cast.media_event.wait()
     self._cast.media_event.clear()
