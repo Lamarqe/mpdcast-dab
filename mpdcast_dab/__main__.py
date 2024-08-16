@@ -79,7 +79,7 @@ def prepare_dab(options, my_ip, web_app):
     return None
   try:
     dab_server = DabServer(my_ip, options['port'])
-  except (ModuleNotFoundError, ImportError) as error:
+  except (ModuleNotFoundError, ImportError, AttributeError) as error:
     logger.warning('Failed to load DAB+ library')
     logger.warning(str(error))
     return None
