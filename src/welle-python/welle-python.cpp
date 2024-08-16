@@ -234,7 +234,7 @@ class PythonRadioController : public RadioControllerInterface {
         Py_BEGIN_ALLOW_THREADS
         WavProgrammeHandler* c_handler = new WavProgrammeHandler(python_handler);
         programme_handlers.emplace(sId, c_handler);
-        Service sadd = rx->getService(sId);
+        const Service& sadd = rx->getService(sId);
         retval = rx->addServiceToDecode(*c_handler, "", sadd);
         Py_END_ALLOW_THREADS
         return retval;
@@ -248,7 +248,7 @@ class PythonRadioController : public RadioControllerInterface {
       else
       {
         Py_BEGIN_ALLOW_THREADS
-        Service sremove = rx->getService(sId);
+        const Service& sremove = rx->getService(sId);
         rx->removeServiceToDecode(sremove);
 
         WavProgrammeHandler* handler = programme_handlers.at(sId);
@@ -264,7 +264,7 @@ class PythonRadioController : public RadioControllerInterface {
       std::string name;
       bool okay = false;
       Py_BEGIN_ALLOW_THREADS
-      Service srv = rx->getService(sId);
+      const Service& srv = rx->getService(sId);
       if (srv.serviceId != 0) 
       {
         name = srv.serviceLabel.utf8_label();
