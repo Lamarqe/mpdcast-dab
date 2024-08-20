@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.27)
 
 project(Welle.Io VERSION 0.0.0 LANGUAGES C CXX)
 
@@ -7,7 +7,7 @@ if(NOT WELLE-IO_VERSION)
 endif()
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 option(BUILD_WELLE_PY    "Build Welle Python Interface"          ON  )
 option(RTLSDR            "Compile with RTL-SDR support"          ON )
@@ -35,7 +35,7 @@ endif()
 find_package(FFTW3f REQUIRED)
 find_package(Faad REQUIRED)
 find_package(Threads REQUIRED)
-find_package (Python COMPONENTS Interpreter Development REQUIRED)
+find_package(pybind11 REQUIRED)
 
 if (RTLSDR)
     find_package(LibRTLSDR REQUIRED)
@@ -134,7 +134,8 @@ add_definitions("-DBUILD_DATE=\"${BUILD_DATE}\"")
 
 if(BUILD_WELLE_PY)
     set(objectName welle_py)
-    add_library (${objectName} SHARED ${welle_py_sources} ${backend_sources} ${input_sources})
+    pybind11_add_module(${objectName} SHARED ${welle_py_sources} ${backend_sources} ${input_sources})
+    SET_TARGET_PROPERTIES(${objectName} PROPERTIES LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_SOURCE_DIR}/mpdcast_dab/welle_python")
 
     if(CMAKE_BUILD_TYPE MATCHES Debug)
       SET_TARGET_PROPERTIES(${objectName} PROPERTIES COMPILE_FLAGS "-O2")
@@ -143,7 +144,7 @@ if(BUILD_WELLE_PY)
     endif(CMAKE_BUILD_TYPE MATCHES Debug)
 
     target_include_directories (${objectName} PUBLIC src/welle-python)
-    target_link_libraries (${objectName}
+    target_link_libraries (${objectName} PRIVATE
       ${LIBRTLSDR_LIBRARIES}
       ${FFTW3F_LIBRARIES}
       ${FAAD_LIBRARIES}
@@ -151,7 +152,6 @@ if(BUILD_WELLE_PY)
       ${CMAKE_DL_LIBS}
       Threads::Threads
     )
-
 endif()
 
 configure_file(

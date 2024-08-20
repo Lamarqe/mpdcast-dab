@@ -34,10 +34,10 @@ class DabServer():
     self._controller           = None
     self._scanner              = None
     self._shutdown_in_progress = False
-    self._dab_device           = welle_io.DabDevice('auto')
+    self._dab_device           = welle_io.DabDevice()
 
   def initialize(self):
-    if not self._dab_device.initialize():
+    if not self._dab_device.init():
       logger.warning('No DAB device available. DAB server will be disabled.')
       return False
 

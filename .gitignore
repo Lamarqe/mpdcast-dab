@@ -9,4 +9,4 @@ build/
 mpdcast_dab/__pycache__/
 mpdcast_dab/cast_sender/__pycache__/
 mpdcast_dab/welle_python/__pycache__/
-mpdcast_dab/welle_python/libwelle_py.so
+mpdcast_dab/welle_python/welle_py.*.so

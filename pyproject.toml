@@ -41,6 +41,3 @@ mpdcast_dab = "mpdcast_dab.__main__:main"
 only-include = [
   "mpdcast_dab"
 ]
-
-[tool.hatch.build.targets.wheel.force-include]
-"build/libwelle_py.so" = "mpdcast_dab/welle_python/libwelle_py.so"

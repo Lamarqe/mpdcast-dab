@@ -17,18 +17,18 @@
 import asyncio
 import logging
 import urllib
-from mpdcast_dab.welle_python.dab_callbacks import RadioControllerInterface
+from mpdcast_dab.welle_python.welle_py import all_channel_names
 
 logger = logging.getLogger(__name__)
 
-class DabScanner(RadioControllerInterface):
+class DabScanner():
   PROGRAM_DISCOVERY_TIMEOUT = 10
 
   def __init__(self, device):
     self._dab_device = device
     self._is_signal = None
     self._scanner_task = None
-    self._all_channel_names = device.__class__.all_channel_names()
+    self._all_channel_names = all_channel_names()
     self.scan_results = {}
     self.ui_status = {}
     self.ui_status['scanner_status'] = '&nbsp;'

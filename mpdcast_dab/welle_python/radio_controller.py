@@ -19,11 +19,10 @@ import datetime
 import logging
 import dataclasses
 from mpdcast_dab.welle_python.wav_programme_handler import WavProgrammeHandler
-from mpdcast_dab.welle_python.dab_callbacks import RadioControllerInterface
 
 logger = logging.getLogger(__name__)
 
-class RadioController(RadioControllerInterface):
+class RadioController():
 
   @dataclasses.dataclass
   class Program:
@@ -146,7 +145,7 @@ class RadioController(RadioControllerInterface):
       # First time subscription to the service. Set up the handler and register it.
       programme_handler = WavProgrammeHandler()
       self._programs[service_id].handler = programme_handler
-      if not self._dab_device.subscribe_program(programme_handler, service_id):
+      if not self._dab_device.subscribe_service(programme_handler, service_id):
         self._cleanup_channel()
         logger.error('Subscription to selected program failed')
         return None

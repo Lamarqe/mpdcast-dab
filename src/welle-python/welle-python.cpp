@@ -12,154 +12,173 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+#include <typeinfo>
 
-// note:   instead of using Py_BEGIN_ALLOW_THREADS / Py_END_ALLOW_THREADS
-// later, in pybind11 use py::gil_scoped_release release; (in Python stack) / py::gil_scoped_acquire acquire; (in C stack that uses Py)
-#include  <Python.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "backend/radio-receiver.h"
 #include "input/input_factory.h"
 #include "various/channels.h"
 
-extern "C" {
-  PyObject* init_device         (PyObject *self, PyObject *args);
-  PyObject* set_channel         (PyObject *self, PyObject *args);
-  PyObject* subscribe_program   (PyObject *self, PyObject *args);
-  PyObject* unsubscribe_program (PyObject *self, PyObject *args);
-  PyObject* stop_device         (PyObject *self, PyObject *args);
-  PyObject* finalize            (PyObject *self, PyObject *args);
-  PyObject* get_service_name    (PyObject *self, PyObject *args);
-  PyObject* is_audio_service    (PyObject *self, PyObject *args);
-  PyObject* PyInit_libwelle_py  (void);
-}
+namespace py = pybind11;
 
 class WavProgrammeHandler: public ProgrammeHandlerInterface {
-  PyObject_HEAD
+public:
+  /* Inherit the constructors */
+  using ProgrammeHandlerInterface::ProgrammeHandlerInterface;
 
-  protected:
-    PyObject* python_impl;
+  virtual void onFrameErrors(int frameErrors) override
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, ProgrammeHandlerInterface, "on_frame_errors", onFrameErrors, frameErrors);
+  }
+  
+  virtual void onNewAudio(std::vector<int16_t>&& audioData, int sampleRate, const std::string& mode) override
+  {
+    py::gil_scoped_acquire acquire;
+    py::handle data = PyBytes_FromStringAndSize((const char*)audioData.data(), 2*audioData.size());
+    PYBIND11_OVERRIDE_PURE_NAME(void, ProgrammeHandlerInterface, "on_new_audio", onNewAudio, data, sampleRate, mode);
+  }
 
-  public:
-    WavProgrammeHandler(PyObject* pythonObj)
-    {
-      this->python_impl = Py_NewRef(pythonObj);
-    }
+  virtual void onRsErrors(bool uncorrectedErrors, int numCorrectedErrors) override 
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, ProgrammeHandlerInterface, "on_rs_errors", onRsErrors, uncorrectedErrors, numCorrectedErrors);
+  }
+  
+  virtual void onAacErrors(int aacErrors) override 
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, ProgrammeHandlerInterface, "on_aac_errors", onAacErrors, aacErrors);
+  }
+  
+  virtual void onNewDynamicLabel(const std::string& label) override
+  {
+    PYBIND11_OVERRIDE_PURE_NAME(void, ProgrammeHandlerInterface, "on_new_dynamic_label", onNewDynamicLabel, label);
+  }
 
-    virtual ~WavProgrammeHandler() 
+  virtual void onMOT(const mot_file_t& mot_file) override
+  {
+    std::string mime_type;
+    switch (mot_file.content_sub_type)
     {
-      Py_DecRef(this->python_impl);
+      case 0x00: mime_type = "image/gif";  break;
+      case 0x01: mime_type = "image/jpeg"; break;
+      case 0x02: mime_type = "image/bmp";  break;
+      case 0x03: mime_type = "image/png";  break;
+      default:   mime_type = "unknown";
     }
-    
-    WavProgrammeHandler           (const WavProgrammeHandler& other)  = delete;
-    WavProgrammeHandler& operator=(const WavProgrammeHandler& other)  = delete;
-    WavProgrammeHandler           (      WavProgrammeHandler&& other) = default;
-    WavProgrammeHandler& operator=(      WavProgrammeHandler&& other) = default;
-
-    virtual void onFrameErrors(int frameErrors) override
-    {
-//      PyGILState_STATE gstate  = PyGILState_Ensure ();
-//      PyObject *result = PyObject_CallMethod (python_impl, "on_frame_errors", "(i)", frameErrors);
-//
-//      if (result)
-//         Py_DECREF (result);
-//      PyGILState_Release (gstate);
-    }
-    
-    virtual void onNewAudio(std::vector<int16_t>&& audioData, int sampleRate, const std::string& mode) override
-    {
-      PyGILState_STATE gstate  = PyGILState_Ensure ();
-      PyObject* data = PyBytes_FromStringAndSize((const char*)audioData.data(), 2*audioData.size());
-      PyObject *result = PyObject_CallMethod (python_impl, "on_new_audio", "(Nis)", data,
-                                              sampleRate, mode.c_str());
-      if (result)
-         Py_DECREF (result);
-      PyGILState_Release (gstate);
-    }
-
-    virtual void onRsErrors(bool uncorrectedErrors, int numCorrectedErrors) override 
-    {
-//      PyGILState_STATE gstate  = PyGILState_Ensure ();
-//      PyObject *result = PyObject_CallMethod (python_impl, "on_rs_errors", "(bi)", uncorrectedErrors, numCorrectedErrors);
-//
-//      if (result)
-//         Py_DECREF (result);
-//      PyGILState_Release (gstate);
-    }
-    
-    virtual void onAacErrors(int aacErrors) override 
-    {
-//      PyGILState_STATE gstate  = PyGILState_Ensure ();
-//      PyObject *result = PyObject_CallMethod (python_impl, "on_aac_errors", "(i)", aacErrors);
-//
-//      if (result)
-//         Py_DECREF (result);
-//      PyGILState_Release (gstate);
-    }
-    
-    virtual void onNewDynamicLabel(const std::string& label) override
-    {
-      PyGILState_STATE gstate  = PyGILState_Ensure ();
-      PyObject *result = PyObject_CallMethod (python_impl, "on_new_dynamic_label", "(s)", label.c_str());
-
-      if (result)
-        Py_DECREF (result);
-      PyGILState_Release (gstate);
-    }
-
-    virtual void onMOT(const mot_file_t& mot_file) override
-    {
-      std::string mime_type;
-      switch (mot_file.content_sub_type)
-      {
-        case 0x00: mime_type = "image/gif";  break;
-        case 0x01: mime_type = "image/jpeg"; break;
-        case 0x02: mime_type = "image/bmp";  break;
-        case 0x03: mime_type = "image/png";  break;
-        default:   mime_type = "unknown";
-      }
-      PyGILState_STATE gstate  = PyGILState_Ensure ();
-      PyObject* data = PyBytes_FromStringAndSize((const char*)mot_file.data.data(), mot_file.data.size());
-      PyObject *result = PyObject_CallMethod (python_impl, "on_mot", "(Nss)", data,
-                                              mime_type.c_str(), mot_file.content_name.c_str());
-      if (result != NULL)
-        Py_DECREF (result);
-      PyGILState_Release (gstate);
-    }
-    
-    virtual void onPADLengthError(size_t /*announced_xpad_len*/, size_t /*xpad_len*/) override
-    {
-      /* Not yet implemented */
-    }
-
+    py::gil_scoped_acquire acquire;
+    py::handle data = PyBytes_FromStringAndSize((const char*)mot_file.data.data(), mot_file.data.size());
+    PYBIND11_OVERRIDE_PURE_NAME(void, ProgrammeHandlerInterface, "on_mot", onMOT, data, mime_type, mot_file.content_name);
+  }
+  
+  virtual void onPADLengthError(size_t announced_xpad_len, size_t xpad_len) override
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, ProgrammeHandlerInterface, "on_pad_length_error", onPADLengthError, announced_xpad_len, xpad_len);
+  }
 };
 
 
 class PythonRadioController : public RadioControllerInterface {
+public:
+  /* Inherit the constructors */
+  using RadioControllerInterface::RadioControllerInterface;
+
+  virtual void onSNR(float snr) override
+  { 
+//    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_snr", onSNR, snr);
+  }
+
+  virtual void onFrequencyCorrectorChange(int fine, int coarse) override 
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_frequency_corrector_change", onFrequencyCorrectorChange, fine, coarse);
+  }
+
+  virtual void onSyncChange(char isSync) override 
+  { 
+    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_sync_change", onSyncChange, (bool) isSync);
+  }
+  virtual void onSignalPresence(bool isSignal) override
+  { 
+    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_signal_presence", onSignalPresence, isSignal);
+  }
+
+  virtual void onServiceDetected(uint32_t sId) override
+  {
+    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_service_detected", onServiceDetected, sId);
+  }
+
+  virtual void onNewEnsemble(uint16_t eId) override
+  {
+    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_new_ensemble", onNewEnsemble, eId);
+  }
+
+  virtual void onSetEnsembleLabel(DabLabel& label) override
+  {
+    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_set_ensemble_label", onSetEnsembleLabel, label.utf8_label());
+  }
+
+  virtual void onDateTimeUpdate(const dab_date_time_t& dateTime) override
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_datetime_update", onDateTimeUpdate, dateTime);
+  }
+
+  virtual void onFIBDecodeSuccess(bool crcCheckOk, const uint8_t* fib) override 
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_fib_decode_success", onFIBDecodeSuccess, crcCheckOk, fib);
+  }
+  
+  virtual void onNewImpulseResponse(std::vector<float>&& data) override
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_new_impulse_response", onNewImpulseResponse, data);
+  }
+  virtual void onNewNullSymbol(std::vector<DSPCOMPLEX>&& data) override
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_new_null_symbol", onNewNullSymbol, data);
+  }
+  virtual void onConstellationPoints(std::vector<DSPCOMPLEX>&& data) override
+  { 
+//    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_constellation_points", onConstellationPoints, data);
+  }
+
+  virtual void onMessage(message_level_t level, const std::string& text, const std::string& text2 = std::string()) override
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_message", onMessage, text, text2, level == message_level_t::Error);
+  }
+
+  virtual void onTIIMeasurement(tii_measurement_t&& m) override
+  {
+//    PYBIND11_OVERRIDE_PURE_NAME(void, RadioControllerInterface, "on_tii_measurement", onTIIMeasurement, m);
+  }
+};
+
+
+class DabDevice {
   protected:
     RadioReceiver* rx = nullptr;
-    PyObject* python_impl = nullptr;
-    std::map<uint32_t, WavProgrammeHandler*> programme_handlers;
   public:
+    PythonRadioController& controller;
+    std::string deviceName;
+    int gain;
     CVirtualInput* device = nullptr;
+    DabDevice(PythonRadioController& radioController, std::string deviceNameParam, int gainParam):
+              controller(radioController), deviceName(deviceNameParam), gain(gainParam)
+      {
+      }
 
-    PythonRadioController(PyObject* pythonObj, const char* device_name, int gain)
+    virtual bool initialize()
     {
-      device = CInputFactory::GetDevice(*this, device_name);
+      device = CInputFactory::GetDevice(controller, deviceName);
       if (device == nullptr)
       {
-        return;
+        return false;
       }
       if (device->getID() == CDeviceID::NULLDEVICE) {
         // We are not interested in a non-functional fallback device.
-        Py_BEGIN_ALLOW_THREADS
+        py::gil_scoped_release release;
         delete device;
         device = nullptr;
-        Py_END_ALLOW_THREADS
-        return;
+        return false;
       }
-
-      this->python_impl = pythonObj;
-      Py_XINCREF (python_impl);
 
       if (gain == -1) {
           device->setAgc(true);
@@ -167,35 +186,33 @@ class PythonRadioController : public RadioControllerInterface {
       else {
           device->setGain(gain);
       }
+      return true;
     }
 
-    virtual ~PythonRadioController() 
+    virtual ~DabDevice() 
     {
-      Py_XDECREF (python_impl);
     }
     
     virtual void close_device() 
     {
-      Py_BEGIN_ALLOW_THREADS
+      py::gil_scoped_release release;
       if (device)
       {
         delete device;
         device = nullptr;
       }
-      Py_END_ALLOW_THREADS
     }
 
-    virtual bool set_channel(std::string channel, bool isScan)
+    virtual bool set_channel(std::string channel, bool isScan = false)
     {
       if (channel.empty())
       {
         if (rx)
         {
-          Py_BEGIN_ALLOW_THREADS
+          py::gil_scoped_release release;
           device->stop();
           delete rx;
           rx = nullptr;
-          Py_END_ALLOW_THREADS
         }
         return true;
       }
@@ -207,7 +224,7 @@ class PythonRadioController : public RadioControllerInterface {
         }
         else
         {
-          Py_BEGIN_ALLOW_THREADS
+          py::gil_scoped_release release;
           Channels channels;
           auto freq = channels.getFrequency(channel);
           device->setFrequency(freq);
@@ -215,29 +232,23 @@ class PythonRadioController : public RadioControllerInterface {
 
           RadioReceiverOptions rro;
           rro.decodeTII = true;
-          rx = new RadioReceiver(*this, *device, rro);
+          rx = new RadioReceiver(controller, *device, rro);
 
           rx->restart(isScan);
-          Py_END_ALLOW_THREADS
           return true;
         }
       }
     }
     
-    virtual bool subscribe_program(PyObject* python_handler, uint32_t sId)
+    virtual bool subscribe_program(WavProgrammeHandler& handler, uint32_t sId)
     {
       if (!rx)
         return false;
       else
       {
-        bool retval;
-        Py_BEGIN_ALLOW_THREADS
-        WavProgrammeHandler* c_handler = new WavProgrammeHandler(python_handler);
-        programme_handlers.emplace(sId, c_handler);
+        py::gil_scoped_release release;
         const Service& sadd = rx->getService(sId);
-        retval = rx->addServiceToDecode(*c_handler, "", sadd);
-        Py_END_ALLOW_THREADS
-        return retval;
+        return rx->addServiceToDecode(handler, "", sadd);
       }
     }
 
@@ -247,37 +258,28 @@ class PythonRadioController : public RadioControllerInterface {
         return false;
       else
       {
-        Py_BEGIN_ALLOW_THREADS
+        py::gil_scoped_release release;
         const Service& sremove = rx->getService(sId);
         rx->removeServiceToDecode(sremove);
-
-        WavProgrammeHandler* handler = programme_handlers.at(sId);
-        programme_handlers.erase(sId);
-        delete handler;
-        Py_END_ALLOW_THREADS
       }
       return true;
     }
 
-    virtual PyObject* get_service_name(uint32_t sId)
+    virtual std::optional<std::string> get_service_name(uint32_t sId)
     {
-      std::string name;
-      bool okay = false;
-      Py_BEGIN_ALLOW_THREADS
+      py::gil_scoped_release release;
       const Service& srv = rx->getService(sId);
       if (srv.serviceId != 0) 
       {
-        name = srv.serviceLabel.utf8_label();
-        okay = true;
+        return srv.serviceLabel.utf8_label();
       }
-      Py_END_ALLOW_THREADS
-      return okay ? PyUnicode_FromString(name.c_str()) : Py_None;
+      else
+        return std::nullopt;
     }
 
-    virtual PyObject* is_audio_service(uint32_t sId)
+    virtual bool is_audio_service(uint32_t sId)
     {
-      PyObject* retVal = nullptr;
-      Py_BEGIN_ALLOW_THREADS
+      py::gil_scoped_release release;
       const Service& srv = rx->getService(sId);
       if (srv.serviceId != 0) 
       {
@@ -285,290 +287,48 @@ class PythonRadioController : public RadioControllerInterface {
         {
           if (sc.transportMode() == TransportMode::Audio &&
               sc.audioType() == AudioServiceComponentType::DABPlus)
-          retVal = Py_True;
+          return true;
         }
-        if (retVal == nullptr)
-          // no audio service
-          retVal = Py_False;
+        return false;
       }
       else
         // service unknown
-        retVal = Py_None;
-      Py_END_ALLOW_THREADS
-      return retVal;
-    }
-
-    virtual void onSNR(float snr) override
-    { 
-//      PyGILState_STATE gstate  = PyGILState_Ensure ();
-//      PyObject *result = PyObject_CallMethod (python_impl, "on_snr", "(f)", snr);//
-//
-//      if (result)
-//         Py_DECREF (result);
-//      PyGILState_Release (gstate);
-    }
-
-    virtual void onFrequencyCorrectorChange(int fine, int coarse) override 
-    {
-//      PyGILState_STATE gstate  = PyGILState_Ensure ();
-//      PyObject *result = PyObject_CallMethod (python_impl, "on_frequency_corrector_change", "(ii)", fine, coarse);
-//
-//      if (result)
-//         Py_DECREF (result);
-//      PyGILState_Release (gstate);
-    }
-
-    virtual void onSyncChange(char isSync) override 
-    { 
-      PyGILState_STATE gstate  = PyGILState_Ensure ();
-      PyObject *result = PyObject_CallMethod (python_impl, "on_sync_change", "(c)", isSync);
-
-      if (result)
-         Py_DECREF (result);
-      PyGILState_Release (gstate);
-    }
-    virtual void onSignalPresence(bool isSignal) override
-    { 
-      PyGILState_STATE gstate  = PyGILState_Ensure ();
-      PyObject *result = PyObject_CallMethod (python_impl, "on_signal_presence", "(O)", PyBool_FromLong(isSignal));
-
-      if (result)
-         Py_DECREF (result);
-      PyGILState_Release (gstate);
-    }
-
-    virtual void onServiceDetected(uint32_t sId) override
-    {
-      PyGILState_STATE gstate  = PyGILState_Ensure ();
-      PyObject *result = PyObject_CallMethod (python_impl, "on_service_detected", "(k)", sId);
-
-      if (result)
-         Py_DECREF (result);
-      PyGILState_Release (gstate);
-    }
-
-    virtual void onNewEnsemble(uint16_t eId) override
-    {
-      PyGILState_STATE gstate  = PyGILState_Ensure ();
-      PyObject *result = PyObject_CallMethod (python_impl, "on_new_ensemble", "(I)", eId);
-
-      if (result)
-         Py_DECREF (result);
-      PyGILState_Release (gstate);
-    }
-
-    virtual void onSetEnsembleLabel(DabLabel& label) override
-    {
-      PyGILState_STATE gstate  = PyGILState_Ensure ();
-      PyObject *result = PyObject_CallMethod (python_impl, "on_set_ensemble_label", "(s)", label.utf8_label().c_str());
-
-      if (result)
-        Py_DECREF (result);
-      PyGILState_Release (gstate);
-    }
-
-    virtual void onDateTimeUpdate(const dab_date_time_t& dateTime) override
-    {
-//      struct tm dabtime;
-//      dabtime.tm_year = dateTime.year - 1900;
-//      dabtime.tm_mon  = dateTime.month - 1;
-//      dabtime.tm_mday = dateTime.day;
-//      dabtime.tm_hour = dateTime.hour + dateTime.hourOffset;
-//      dabtime.tm_min  = dateTime.minutes + dateTime.minuteOffset;
-//      dabtime.tm_sec  = dateTime.seconds;
-//      time_t timestamp = mktime(&dabtime);
-//
-//      PyGILState_STATE gstate  = PyGILState_Ensure ();
-//      PyObject *result = PyObject_CallMethod (python_impl, "on_datetime_update", "(i)", timestamp);
-//
-//      if (result)
-//         Py_DECREF (result);
-//      PyGILState_Release (gstate);
-    }
-
-    virtual void onFIBDecodeSuccess(bool crcCheckOk, const uint8_t* fib) override 
-    {
-//      const uint16_t fiblarge = *fib;
-//      PyGILState_STATE gstate  = PyGILState_Ensure ();
-//      PyObject *result = PyObject_CallMethod (python_impl, "on_fib_decode_success", "(pH)", crcCheckOk, &fiblarge);
-//
-//      if (result)
-//         Py_DECREF (result);
-//      PyGILState_Release (gstate);
-    }
-    
-    virtual void onNewImpulseResponse(std::vector<float>&& /*data*/) override
-    {
-      /* Not yet implemented */
-    }
-    virtual void onNewNullSymbol(std::vector<DSPCOMPLEX>&& /*data*/) override
-    { 
-      /* Not yet implemented */
-    }
-    virtual void onConstellationPoints(std::vector<DSPCOMPLEX>&& /*data*/) override
-    { 
-      /* Not yet implemented */
-    }
-
-    virtual void onMessage(message_level_t level, const std::string& text, const std::string& text2 = std::string()) override
-    {
-//      bool isError = (level == message_level_t::Error);
-//
-//      PyGILState_STATE gstate  = PyGILState_Ensure ();
-//      PyObject *result = PyObject_CallMethod (python_impl, "on_message", "(ssp)", text, text2, isError);
-//
-//      if (result)
-//         Py_DECREF (result);
-//      PyGILState_Release (gstate);
-    }
-
-    virtual void onTIIMeasurement(tii_measurement_t&& m) override
-    {
-      /* Not yet implemented */
+        return false;
     }
 };
 
-PyObject *init_device (PyObject* /*self*/, PyObject *args)
-{
-  char* deviceName;
-  int   gain;
-  PyObject* pythonController;
-  PyArg_ParseTuple (args, "Osi", &pythonController, &deviceName, &gain);
-  PythonRadioController* ri = new PythonRadioController(pythonController, deviceName, gain);
-  if (ri->device)
-    return PyCapsule_New (ri, "library_object", NULL);
-  else
-  {
-    delete ri;
-    Py_RETURN_NONE;
-  }
-}
-
-PyObject *set_channel (PyObject */*self*/, PyObject *args) 
-{
-  PyObject  *handle_capsule;
-  char  *chan;
-  PyObject  *is_scan_pyobj;
-
-  PyArg_ParseTuple (args, "OsO", &handle_capsule, &chan, &is_scan_pyobj);
-  PythonRadioController* ri = reinterpret_cast<PythonRadioController*>(PyCapsule_GetPointer (handle_capsule, "library_object"));
-  bool isScan = PyObject_IsTrue(is_scan_pyobj);
-  
-  std::string channel(chan);
-  bool chan_ok = ri->set_channel(channel, isScan);
-  return chan_ok ? Py_True : Py_False;
-}
-
-PyObject *subscribe_program (PyObject */*self*/, PyObject *args) 
-{
-  PyObject* programme_handler;
-  PyObject* handle_capsule;
-  uint32_t sId;
-
-  PyArg_ParseTuple (args, "OOi", &handle_capsule, &programme_handler, &sId);
-  PythonRadioController* ri = reinterpret_cast<PythonRadioController*>(PyCapsule_GetPointer (handle_capsule, "library_object"));
-
-  bool subscribe_ok = ri->subscribe_program(programme_handler, sId);
-  return subscribe_ok ? Py_True : Py_False;
-}
-
-PyObject *get_service_name (PyObject */*self*/, PyObject *args)
-{
-  PyObject  *handle_capsule;
-  uint32_t sId;
-
-  PyArg_ParseTuple (args, "OI", &handle_capsule, &sId);
-  PythonRadioController* ri = reinterpret_cast<PythonRadioController*>(PyCapsule_GetPointer (handle_capsule, "library_object"));
-
-  return ri->get_service_name(sId);
-}
-
-PyObject *is_audio_service (PyObject */*self*/, PyObject *args)
-{
-  PyObject  *handle_capsule;
-  uint32_t sId;
-
-  PyArg_ParseTuple (args, "OI", &handle_capsule, &sId);
-  PythonRadioController* ri = reinterpret_cast<PythonRadioController*>(PyCapsule_GetPointer (handle_capsule, "library_object"));
-
-  return ri->is_audio_service(sId);
-}
-
-PyObject *unsubscribe_program (PyObject */*self*/, PyObject *args) {
-  PyObject  *handle_capsule;
-  uint32_t sId;
-
-  PyArg_ParseTuple (args, "OI", &handle_capsule, &sId);
-  PythonRadioController* ri = reinterpret_cast<PythonRadioController*>(PyCapsule_GetPointer (handle_capsule, "library_object"));
-
-  bool unsubscribe_ok = ri->unsubscribe_program(sId);
-  return unsubscribe_ok ? Py_True : Py_False;
-}
-
-PyObject *close_device (PyObject */*self*/, PyObject *args) {
-  PyObject *handle_capsule;
-
-  PyArg_ParseTuple (args, "O", &handle_capsule);
-  PythonRadioController* ri = reinterpret_cast<PythonRadioController*>(PyCapsule_GetPointer (handle_capsule, "library_object"));
-
-  ri->close_device();
-  Py_RETURN_NONE;
-}
-
-PyObject *finalize (PyObject */*self*/, PyObject *args) {
-  PyObject *handle_capsule;
-
-  PyArg_ParseTuple (args, "O", &handle_capsule);
-  PythonRadioController* ri = reinterpret_cast<PythonRadioController*>(PyCapsule_GetPointer (handle_capsule, "library_object"));
-
-  delete ri;
-  Py_RETURN_NONE;
-}
-
-PyObject *all_channel_names (PyObject */*self*/, PyObject *args)
+std::list<std::string> all_channel_names ()
 {
   Channels chans;
-  PyObject* result = PyList_New(0);
-  PyList_Append(result, PyUnicode_FromString(chans.getCurrentChannel().c_str()));
+  std::list<std::string> result;
+  result.emplace_back(chans.getCurrentChannel());
   for (int i = 1; i < NUMBEROFCHANNELS; ++i)
   {
-    PyList_Append(result, PyUnicode_FromString(chans.getNextChannel().c_str()));
+    result.emplace_back(chans.getNextChannel());
   }    
   return result; 
 }
 
-static PyMethodDef module_methods [] = {
-  {"init_device",         init_device,         METH_VARARGS, ""},
-  {"set_channel",         set_channel,         METH_VARARGS, ""},
-  {"subscribe_program",   subscribe_program,   METH_VARARGS, ""},
-  {"unsubscribe_program", unsubscribe_program, METH_VARARGS, ""},
-  {"close_device",        close_device,        METH_VARARGS, ""},
-  {"finalize",            finalize,            METH_VARARGS, ""},
-  {"get_service_name",    get_service_name,    METH_VARARGS, ""},
-  {"is_audio_service",    is_audio_service,    METH_VARARGS, ""},
-  {"all_channel_names",   all_channel_names,   METH_VARARGS, ""},
-  {NULL, NULL, 0, NULL}
-};
 
-static struct PyModuleDef welle_io = {
-  PyModuleDef_HEAD_INIT,
-  .m_name = "libwelle_py",
-  .m_doc = "",
-  .m_size = -1,
-  module_methods,
-  NULL,
-  NULL,
-  NULL,
-  NULL
-};
+PYBIND11_MODULE(welle_py, m) 
+{
+  py::class_<ProgrammeHandlerInterface, WavProgrammeHandler>(m, "ProgrammeHandlerInterface")
+     .def(py::init<>());
 
-PyMODINIT_FUNC
-PyInit_libwelle_py (void) {
-  PyObject *m;
+  py::class_<RadioControllerInterface, PythonRadioController>(m, "RadioControllerInterface")
+     .def(py::init<>());
 
-  m = PyModule_Create(&welle_io);
-  if (m == NULL)
-    return NULL;
-  
-  return m;
+  py::class_<DabDevice>(m, "DabDeviceCpp")
+     .def(py::init<PythonRadioController&, const std::string&, int>())
+     .def("initialize", &DabDevice::initialize)
+     .def("close_device", &DabDevice::close_device)
+     .def("set_channel", &DabDevice::set_channel, py::arg("channel"), py::arg("isScan") = false)
+     .def("subscribe_program", &DabDevice::subscribe_program)
+     .def("unsubscribe_program", &DabDevice::unsubscribe_program)
+     .def("get_service_name", &DabDevice::get_service_name)
+     .def("is_audio_service", &DabDevice::is_audio_service)
+     .def_readonly("device_name", &DabDevice::deviceName)
+     .def_readonly("gain", &DabDevice::gain);
+
+  m.def("all_channel_names", &all_channel_names);
 }
