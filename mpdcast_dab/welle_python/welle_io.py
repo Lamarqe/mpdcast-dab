@@ -28,11 +28,6 @@ class DabDevice(DabDeviceCpp):
     self._handler = RadioCallbackForwarder()
     DabDeviceCpp.__init__(self, self._handler, device_name, gain)
 
-  def init(self) -> bool:
-    retval = self.initialize()
-    atexit.register(self.cleanup)
-    return retval
-
   def aquire_now(self, handler: object) -> bool:
     return self._handler.subscribe_for_callbacks(handler)
 
@@ -45,7 +40,3 @@ class DabDevice(DabDeviceCpp):
     handler.forwarder = forwarder
     retval = self.subscribe_program(forwarder, service_id)
     return retval
-
-  def cleanup(self) -> None:
-    self.set_channel('', False)
-    self.close_device()
