@@ -37,7 +37,8 @@ Repository = "https://github.com/Lamarqe/mpdcast-dab.git"
 [project.scripts]
 mpdcast_dab = "mpdcast_dab.__main__:main"
 
-[tool.hatch.build.targets.wheel]
-only-include = [
+[tool.hatch.build.targets.sdist]
+ignore-vcs = true
+include = [
   "mpdcast_dab"
 ]
