@@ -37,9 +37,6 @@ Repository = "https://github.com/Lamarqe/mpdcast-dab.git"
 [project.scripts]
 mpdcast_dab = "mpdcast_dab.__main__:main"
 
-[tool.hatch.build.targets.sdist]
-ignore-vcs = true
-
 [tool.hatch.build.targets.wheel]
-packages = ["mpdcast_dab"]
+packages =  ["mpdcast_dab"]
 artifacts = ["mpdcast_dab/welle_python/welle_py.*.so"]

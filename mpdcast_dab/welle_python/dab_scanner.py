@@ -18,10 +18,11 @@ import asyncio
 import logging
 import urllib
 from mpdcast_dab.welle_python.welle_py import all_channel_names
+from mpdcast_dab.welle_python.dab_callbacks import RadioHandler
 
 logger = logging.getLogger(__name__)
 
-class DabScanner():
+class DabScanner(RadioHandler):
   PROGRAM_DISCOVERY_TIMEOUT = 10
 
   def __init__(self, device):

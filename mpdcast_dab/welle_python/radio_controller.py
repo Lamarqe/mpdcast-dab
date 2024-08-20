@@ -19,10 +19,11 @@ import datetime
 import logging
 import dataclasses
 from mpdcast_dab.welle_python.wav_programme_handler import WavProgrammeHandler
+from mpdcast_dab.welle_python.dab_callbacks import RadioHandler
 
 logger = logging.getLogger(__name__)
 
-class RadioController():
+class RadioController(RadioHandler):
 
   @dataclasses.dataclass
   class Program:
