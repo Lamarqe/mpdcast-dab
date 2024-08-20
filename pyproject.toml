@@ -42,3 +42,4 @@ ignore-vcs = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["mpdcast_dab"]
+artifacts = ["mpdcast_dab/welle_python/welle_py.*.so"]
