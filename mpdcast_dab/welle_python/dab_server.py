@@ -37,7 +37,7 @@ class DabServer():
     self._dab_device           = welle_io.DabDevice()
 
   def initialize(self):
-    if not self._dab_device.init():
+    if not self._dab_device.initialize():
       logger.warning('No DAB device available. DAB server will be disabled.')
       return False
 
@@ -77,7 +77,8 @@ class DabServer():
     self._shutdown_in_progress = True
     self._controller.stop()
     await self._scanner.stop()
-
+    self._dab_device.set_channel('', False)
+    self._dab_device.close_device()
 
   # is_float should only be true if the audio data is in 32-bit floating-point format.
   def _wav_header(self, is_float, channels, bit_rate, sample_rate):

@@ -24,12 +24,9 @@ from mpdcast_dab.welle_python.dab_callbacks import RadioCallbackForwarder, Progr
 logger = logging.getLogger(__name__)
 
 class DabDevice(DabDeviceCpp):
-  def __init__(self,
-               handler: RadioCallbackForwarder = RadioCallbackForwarder(),
-               device_name: str = 'auto',
-               gain: int = -1):
-    DabDeviceCpp.__init__(self, handler, device_name, gain)
-    self._handler = handler
+  def __init__(self, device_name: str = 'auto', gain: int = -1):
+    self._handler = RadioCallbackForwarder()
+    DabDeviceCpp.__init__(self, self._handler, device_name, gain)
 
   def init(self) -> bool:
     retval = self.initialize()
