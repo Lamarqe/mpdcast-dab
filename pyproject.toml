@@ -39,6 +39,6 @@ mpdcast_dab = "mpdcast_dab.__main__:main"
 
 [tool.hatch.build.targets.sdist]
 ignore-vcs = true
-include = [
-  "mpdcast_dab"
-]
+
+[tool.hatch.build.targets.wheel]
+packages = ["mpdcast_dab"]
