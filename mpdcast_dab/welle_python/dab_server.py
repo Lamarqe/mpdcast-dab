@@ -28,13 +28,13 @@ logger = logging.getLogger(__name__)
 class DabServer():
 
   def __init__(self, my_ip, port):
-    welle_io = __import__('mpdcast_dab.welle_python.welle_io').welle_python.welle_io
+    welle_py = __import__('mpdcast_dab.welle_python.welle_py').welle_python.welle_py
     self._my_ip                = my_ip
     self._port                 = port
     self._controller           = None
     self._scanner              = None
     self._shutdown_in_progress = False
-    self._dab_device           = welle_io.DabDevice()
+    self._dab_device           = welle_py.DabDevice()
 
   def initialize(self):
     if not self._dab_device.initialize():
@@ -77,7 +77,7 @@ class DabServer():
     self._shutdown_in_progress = True
     self._controller.stop()
     await self._scanner.stop()
-    self._dab_device.set_channel('', False)
+    self._dab_device.reset_channel()
     self._dab_device.close_device()
 
   # is_float should only be true if the audio data is in 32-bit floating-point format.

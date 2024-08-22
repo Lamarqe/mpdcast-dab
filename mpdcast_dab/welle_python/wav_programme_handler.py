@@ -18,6 +18,7 @@ import asyncio
 import logging
 import dataclasses
 from mpdcast_dab.welle_python.dab_callbacks import ProgrammeHandler
+from mpdcast_dab.welle_python.welle_py import ServiceEventHandler
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class WavProgrammeData():
     self.label       = ''
     self.sample_rate = None
 
-class WavProgrammeHandler(ProgrammeHandler):
+class WavProgrammeHandler(ServiceEventHandler, ProgrammeHandler):
   @dataclasses.dataclass
   class WavProgrammEvents():
     def __init__(self):
@@ -52,6 +53,7 @@ class WavProgrammeHandler(ProgrammeHandler):
       self.data_lock   = asyncio.Lock()
 
   def __init__(self):
+    ServiceEventHandler.__init__(self)
     self.subscribers         = 0
     self.data                = WavProgrammeData()
     self._audio_buffer       = self.AudioBuffer()

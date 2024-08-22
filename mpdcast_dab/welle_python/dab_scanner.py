@@ -17,15 +17,16 @@
 import asyncio
 import logging
 import urllib
-from mpdcast_dab.welle_python.welle_py import all_channel_names
+from mpdcast_dab.welle_python.welle_py import ChannelEventHandler, all_channel_names
 from mpdcast_dab.welle_python.dab_callbacks import RadioHandler
 
 logger = logging.getLogger(__name__)
 
-class DabScanner(RadioHandler):
+class DabScanner(ChannelEventHandler, RadioHandler):
   PROGRAM_DISCOVERY_TIMEOUT = 10
 
   def __init__(self, device):
+    ChannelEventHandler.__init__(self)
     self._dab_device = device
     self._is_signal = None
     self._scanner_task = None
@@ -41,7 +42,7 @@ class DabScanner(RadioHandler):
   async def start_scan(self):
     if self._scanner_task:
       self.ui_status['scanner_status']      = 'Scan in progress. No new scan possible.'
-    elif not self._dab_device.aquire_now(self):
+    elif not self._dab_device.lock.acquire(blocking=False):
       self.ui_status['scanner_status']      = 'DAB device is locked. No scan possible.'
     else:
       self._scanner_task = asyncio.create_task(self._run_scan())
@@ -93,7 +94,7 @@ class DabScanner(RadioHandler):
       for channel in self._all_channel_names:
         self.scan_results[channel] = {}
         # tune to the channel
-        self._dab_device.set_channel(channel, True)
+        self._dab_device.set_channel(channel, self, True)
         await self._signal_presence_event.wait()
         if self._is_signal:
           # wait for program detection
@@ -105,14 +106,14 @@ class DabScanner(RadioHandler):
             self.scan_results[channel][service_id]['name'] = name
             service_count+= 1
 
-        self._dab_device.set_channel('', True)
+        self._dab_device.reset_channel()
     except asyncio.CancelledError:
-      self._dab_device.set_channel('', True)
+      self._dab_device.reset_channel()
       self.ui_status['scanner_status'] = 'Scan stopped. Found ' + str(service_count) + ' radio services.'
       raise
     finally:
       # scan finished. release the DAB device and remove strong reference to running task
-      self._dab_device.release()
+      self._dab_device.lock.release()
       self._scanner_task = None
       self.ui_status['download_ready'] = bool(service_count > 0)
 

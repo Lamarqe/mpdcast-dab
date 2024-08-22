@@ -14,10 +14,6 @@
 
 """Callback interfaces to handle DAB+ data and events"""
 
-import asyncio
-
-from mpdcast_dab.welle_python.welle_py import RadioControllerInterface, ProgrammeHandlerInterface
-
 class ProgrammeHandler():
   async def on_frame_errors(self, frame_errors: int) -> None:
     pass
@@ -67,43 +63,3 @@ class RadioHandler():
 
   async def on_message(self, text: str, text2: str, is_error: bool) -> None:
     pass
-
-# This logic below forwards all c-lib callbacks to the actual Interface object
-# Making this indirect has two reasons:
-# 1: It allows dynamic controller objects in python without having to re-initialize the device in C
-# 2: The indirection includes a thread handover into async which is required anyways
-def _async_forward(target, attr, loop):
-  method = getattr(target, attr)
-  def asyncio_callback(*args, **kwargs):
-    asyncio.run_coroutine_threadsafe(method(*args, **kwargs), loop)
-  return asyncio_callback
-
-class RadioCallbackForwarder(RadioControllerInterface):
-  def __init__(self):
-    RadioControllerInterface.__init__(self)
-    self._target = None
-    self._loop = asyncio.get_event_loop()
-
-  def __getattr__(self, attr):
-    return _async_forward(self._target, attr, self._loop)
-
-  def subscribe_for_callbacks(self, target: RadioHandler) -> bool:
-    if self._target is not None:
-      return False
-    self._target = target
-    return True
-
-  def unsubscribe_from_callbacks(self) -> bool:
-    if self._target is None:
-      return False
-    self._target = None
-    return True
-
-class ProgrammeCallbackForwarder(ProgrammeHandlerInterface):
-  def __init__(self, target: ProgrammeHandler):
-    ProgrammeHandlerInterface.__init__(self)
-    self._target = target
-    self._loop = asyncio.get_event_loop()
-
-  def __getattr__(self, attr):
-    return _async_forward(self._target, attr, self._loop)

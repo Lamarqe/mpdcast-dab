@@ -20,10 +20,11 @@ import logging
 import dataclasses
 from mpdcast_dab.welle_python.wav_programme_handler import WavProgrammeHandler
 from mpdcast_dab.welle_python.dab_callbacks import RadioHandler
+from mpdcast_dab.welle_python.welle_py import ChannelEventHandler
 
 logger = logging.getLogger(__name__)
 
-class RadioController(RadioHandler):
+class RadioController(ChannelEventHandler, RadioHandler):
 
   @dataclasses.dataclass
   class Program:
@@ -40,6 +41,7 @@ class RadioController(RadioHandler):
   CHANNEL_RESET_DELAY       = 5
 
   def __init__(self, device):
+    ChannelEventHandler.__init__(self)
     self._dab_device         = device
     self._programs           = {}
     self._channel            = self.ChannelData()
@@ -109,12 +111,12 @@ class RadioController(RadioHandler):
       # nothing to do for us here
       return True
     # There is no active channel. tune the device to the channel
-    if not self._dab_device.aquire_now(self):
+    if not self._dab_device.lock.acquire(blocking=False):
       logger.error('DAB device is locked. No playback possible.')
       return False
-    if not self._dab_device.set_channel(channel):
+    if not self._dab_device.set_channel(channel, self):
       logger.error("could not set the device channel.")
-      self._dab_device.release()
+      self._dab_device.lock.release()
       return False
     # success!
     self._channel.name = channel
@@ -146,7 +148,7 @@ class RadioController(RadioHandler):
       # First time subscription to the service. Set up the handler and register it.
       programme_handler = WavProgrammeHandler()
       self._programs[service_id].handler = programme_handler
-      if not self._dab_device.subscribe_service(programme_handler, service_id):
+      if not self._dab_device.subscribe_program(programme_handler, service_id):
         self._cleanup_channel()
         logger.error('Subscription to selected program failed')
         return None
@@ -199,10 +201,10 @@ class RadioController(RadioHandler):
 
   def _reset_channel(self):
     assert not next((prog for prog in self._programs.values() if prog.handler is not None), None)
-    self._dab_device.set_channel("")
+    self._dab_device.reset_channel()
     self._channel.name = None
     self._programs.clear()
-    self._dab_device.release()
+    self._dab_device.lock.release()
 
   def stop(self):
     active_sids = list(self._programs.keys())
