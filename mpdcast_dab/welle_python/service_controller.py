@@ -12,7 +12,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-"""Class that receives DAB data and forwards it to the subscribers"""
+"""Class that receives data of one service and forwards it to the subscribers"""
 
 import asyncio
 import logging
@@ -27,7 +27,7 @@ class UnsubscribedError(Exception):
   pass
 
 @dataclasses.dataclass
-class WavProgrammeData():
+class ServiceData():
   def __init__(self):
     # properties for most recent data.
     # Can be used directly by user applications to get the most recent data
@@ -35,9 +35,9 @@ class WavProgrammeData():
     self.label       = ''
     self.sample_rate = None
 
-class WavProgrammeHandler(ServiceEventHandler, ServiceEventPass):
+class ServiceController(ServiceEventHandler, ServiceEventPass):
   @dataclasses.dataclass
-  class WavProgrammEvents():
+  class ServiceEvents():
     def __init__(self):
       # internal update notification events
       self.audio      = asyncio.Event()
@@ -49,15 +49,15 @@ class WavProgrammeHandler(ServiceEventHandler, ServiceEventPass):
     BUFFER_SIZE = 10
     def __init__(self):
       self.next_frame  = 0
-      self.data        = [b''] * WavProgrammeHandler.AudioBuffer.BUFFER_SIZE
+      self.data        = [b''] * ServiceController.AudioBuffer.BUFFER_SIZE
       self.data_lock   = asyncio.Lock()
 
   def __init__(self):
     ServiceEventHandler.__init__(self)
     self.subscribers         = 0
-    self.data                = WavProgrammeData()
+    self.data                = ServiceData()
     self._audio_buffer       = self.AudioBuffer()
-    self._events             = self.WavProgrammEvents()
+    self._events             = self.ServiceEvents()
     self._delete_in_progress = False
 
   # notification routines for user applications
@@ -100,7 +100,7 @@ class WavProgrammeHandler(ServiceEventHandler, ServiceEventPass):
     self.data.sample_rate = sample_rate
     async with self._audio_buffer.data_lock:
       self._audio_buffer.data[self._audio_buffer.next_frame] = audio_data
-      self._audio_buffer.next_frame = (self._audio_buffer.next_frame+1) % WavProgrammeHandler.AudioBuffer.BUFFER_SIZE
+      self._audio_buffer.next_frame = (self._audio_buffer.next_frame+1) % ServiceController.AudioBuffer.BUFFER_SIZE
     if not self._delete_in_progress:
       self._events.audio.set()
       self._events.audio.clear()

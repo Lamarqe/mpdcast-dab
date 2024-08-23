@@ -23,7 +23,7 @@ from mpdcast_dab.welle_python.dab_callbacks import ChannelEventPass
 logger = logging.getLogger(__name__)
 
 class DabScanner(ChannelEventHandler, ChannelEventPass):
-  PROGRAM_DISCOVERY_TIMEOUT = 10
+  SERVICE_DISCOVERY_TIMEOUT = 10
 
   def __init__(self, device):
     ChannelEventHandler.__init__(self)
@@ -97,10 +97,10 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
         self._dab_device.set_channel(channel, self, True)
         await self._signal_presence_event.wait()
         if self._is_signal:
-          # wait for program detection
-          await asyncio.sleep(DabScanner.PROGRAM_DISCOVERY_TIMEOUT)
+          # wait for service detection
+          await asyncio.sleep(DabScanner.SERVICE_DISCOVERY_TIMEOUT)
 
-          # collect program names
+          # collect service names
           for service_id in self.scan_results[channel].keys():
             name = self._dab_device.get_service_name(service_id).rstrip()
             self.scan_results[channel][service_id]['name'] = name

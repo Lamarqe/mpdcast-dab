@@ -240,7 +240,7 @@ class DabDevice {
       return true;
     }
     
-    virtual bool subscribe_program(ServiceEventHandler& handler, uint32_t sId)
+    virtual bool subscribe_service(ServiceEventHandler& handler, uint32_t sId)
     {
       if (!rx)
         return false;
@@ -252,7 +252,7 @@ class DabDevice {
       }
     }
 
-    virtual bool unsubscribe_program(uint32_t sId)
+    virtual bool unsubscribe_service(uint32_t sId)
     {
       if (!rx)
         return false;
@@ -326,8 +326,8 @@ PYBIND11_MODULE(welle_py, m)
      .def("close_device", &DabDevice::close_device)
      .def("set_channel", &DabDevice::set_channel, py::arg("channel"), py::arg("handler"), py::arg("isScan") = false)
      .def("reset_channel", &DabDevice::reset_channel)
-     .def("subscribe_program", &DabDevice::subscribe_program)
-     .def("unsubscribe_program", &DabDevice::unsubscribe_program)
+     .def("subscribe_service", &DabDevice::subscribe_service)
+     .def("unsubscribe_service", &DabDevice::unsubscribe_service)
      .def("get_service_name", &DabDevice::get_service_name)
      .def("is_audio_service", &DabDevice::is_audio_service)
      .def_readonly("device_name", &DabDevice::deviceName)

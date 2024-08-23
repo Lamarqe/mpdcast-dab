@@ -21,7 +21,7 @@ from aiohttp import web
 
 from mpdcast_dab.welle_python.radio_controller import RadioController
 from mpdcast_dab.welle_python.dab_scanner import DabScanner
-from mpdcast_dab.welle_python.wav_programme_handler import UnsubscribedError
+from mpdcast_dab.welle_python.service_controller import UnsubscribedError
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class DabServer():
     welle_py = __import__('mpdcast_dab.welle_python.welle_py').welle_python.welle_py
     self._my_ip                = my_ip
     self._port                 = port
-    self._controller           = None
+    self._radio_controller     = None
     self._scanner              = None
     self._shutdown_in_progress = False
     self._dab_device           = welle_py.DabDevice()
@@ -41,7 +41,7 @@ class DabServer():
       logger.warning('No DAB device available. DAB server will be disabled.')
       return False
 
-    self._controller = RadioController(self._dab_device)
+    self._radio_controller = RadioController(self._dab_device)
     self._scanner    = DabScanner(self._dab_device)
     return True
 
@@ -51,11 +51,11 @@ class DabServer():
             web.get('/get_scanner_details', self.get_scanner_details),
             web.post('/start_scan', self.start_scan),
             web.post('/stop_scan', self.stop_scan),
-            web.get(r'/stream/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_audio),
-            web.get(r'/image/current/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_current_image),
-            web.get(r'/label/current/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_current_label),
-            web.get(r'/image/next/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_next_image),
-            web.get(r'/label/next/{channel:[0-9]{1,2}[A-Z]}/{program:.+}', self.get_next_label)]
+            web.get(r'/stream/{channel:[0-9]{1,2}[A-Z]}/{service:.+}', self.get_audio),
+            web.get(r'/image/current/{channel:[0-9]{1,2}[A-Z]}/{service:.+}', self.get_current_image),
+            web.get(r'/label/current/{channel:[0-9]{1,2}[A-Z]}/{service:.+}', self.get_current_label),
+            web.get(r'/image/next/{channel:[0-9]{1,2}[A-Z]}/{service:.+}', self.get_next_image),
+            web.get(r'/label/next/{channel:[0-9]{1,2}[A-Z]}/{service:.+}', self.get_next_label)]
 
   async def get_scanner_playlist(self, request):
     resp = self._scanner.get_playlist(self._my_ip, self._port)
@@ -75,7 +75,7 @@ class DabServer():
 
   async def stop(self):
     self._shutdown_in_progress = True
-    self._controller.stop()
+    self._radio_controller.stop()
     await self._scanner.stop()
     self._dab_device.reset_channel()
     self._dab_device.close_device()
@@ -105,12 +105,12 @@ class DabServer():
 
   async def get_next_image(self, request):
     channel = request.match_info['channel']
-    program = request.match_info['program']
-    logger.debug('get_next_image: channel: %s program: %s', channel, program)
-    handler = self._controller.get_handler(program)
-    if handler:
+    service = request.match_info['service']
+    logger.debug('get_next_image: channel: %s service: %s', channel, service)
+    controller = self._radio_controller.get_service_controller(service)
+    if controller:
       try:
-        image = await handler.new_picture()
+        image = await controller.new_picture()
         return web.Response(body = image['data'],
                             content_type = image['type'],
                             headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
@@ -122,12 +122,12 @@ class DabServer():
 
   async def get_next_label(self, request):
     channel = request.match_info['channel']
-    program = request.match_info['program']
-    logger.debug('get_next_label: channel: %s program: %s', channel, program)
-    handler = self._controller.get_handler(program)
-    if handler:
+    service = request.match_info['service']
+    logger.debug('get_next_label: channel: %s service: %s', channel, service)
+    controller = self._radio_controller.get_service_controller(service)
+    if controller:
       try:
-        label = await handler.new_label()
+        label = await controller.new_label()
         return web.Response(text=label,
                             headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
       except UnsubscribedError as exc:
@@ -138,12 +138,12 @@ class DabServer():
 
   async def get_current_image(self, request):
     channel = request.match_info['channel']
-    program = request.match_info['program']
-    logger.debug('get_current_image: channel: %s program: %s', channel, program)
-    handler = self._controller.get_handler(program)
-    if (handler and len(handler.data.picture['data']) > 0):
-      return web.Response(body = handler.data.picture['data'],
-                          content_type = handler.data.picture['type'],
+    service = request.match_info['service']
+    logger.debug('get_current_image: channel: %s service: %s', channel, service)
+    controller = self._radio_controller.get_service_controller(service)
+    if (controller and len(controller.data.picture['data']) > 0):
+      return web.Response(body = controller.data.picture['data'],
+                          content_type = controller.data.picture['type'],
                           headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
     # no data found
     raise web.HTTPNotFound()
@@ -151,11 +151,11 @@ class DabServer():
 
   async def get_current_label(self, request):
     channel = request.match_info['channel']
-    program = request.match_info['program']
-    logger.debug('get_current_label: channel: %s program: %s', channel, program)
-    handler = self._controller.get_handler(program)
-    if handler:
-      return web.Response(text=handler.data.label,
+    service = request.match_info['service']
+    logger.debug('get_current_label: channel: %s service: %s', channel, service)
+    controller = self._radio_controller.get_service_controller(service)
+    if controller:
+      return web.Response(text=controller.data.label,
                           headers={'Cache-Control': 'no-cache', 'Connection': 'Close'})
     # no data found
     raise web.HTTPNotFound()
@@ -166,19 +166,19 @@ class DabServer():
       raise web.HTTPServiceUnavailable()
 
     channel = request.match_info['channel']
-    program = request.match_info['program']
-    if program.startswith('cover.'):
+    service = request.match_info['service']
+    if service.startswith('cover.'):
       raise web.HTTPNotFound()
-    logger.info('new audio request for %s', program)
+    logger.info('new audio request for %s', service)
 
     # Check if the device is busy with streaming another channel
-    if not self._controller.can_subscribe(channel):
-      # This might be a program switch with the new subscription request coming faster then the unsubscribe.
+    if not self._radio_controller.can_subscribe(channel):
+      # This might be a service switch with the new subscription request coming faster then the unsubscribe.
       # So we wait for half a second and continue with the request processing
       # In case of a switch, the unsubscribe will have been processed until then
       await asyncio.sleep(0.5)
 
-    handler = await self._controller.subscribe_program(channel, program)
+    handler = await self._radio_controller.subscribe_service(channel, service)
     if not handler:
       raise web.HTTPServiceUnavailable()
 
@@ -203,7 +203,7 @@ class DabServer():
             asyncio.exceptions.TimeoutError,
             ConnectionResetError):
       # user cancelled the stream, so unsubscribe
-      self._controller.unsubscribe_program(program)
+      self._radio_controller.unsubscribe_service(service)
       return response
     except UnsubscribedError:
       return response
