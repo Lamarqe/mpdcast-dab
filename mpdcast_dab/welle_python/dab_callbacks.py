@@ -12,9 +12,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-"""Callback interfaces to handle DAB+ data and events"""
+"""Empty callback handlers for DAB+ data and events"""
 
-class ProgrammeHandler():
+class ServiceEventPass():
   async def on_frame_errors(self, frame_errors: int) -> None:
     pass
 
@@ -33,7 +33,7 @@ class ProgrammeHandler():
   async def on_mot(self, data: bytes, mime_type: str, name: str) -> None:
     pass
 
-class RadioHandler():
+class ChannelEventPass():
   async def on_snr(self, snr: float) -> None:
     pass
 
