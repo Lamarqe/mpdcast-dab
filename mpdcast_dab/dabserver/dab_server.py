@@ -178,8 +178,8 @@ class DabServer():
       # In case of a switch, the unsubscribe will have been processed until then
       await asyncio.sleep(0.5)
 
-    handler = await self._radio_controller.subscribe_service(channel, service)
-    if not handler:
+    service_controller = await self._radio_controller.subscribe_service(channel, service)
+    if not service_controller:
       raise web.HTTPServiceUnavailable()
 
     # from here on, the device sends us the audio stream
@@ -192,12 +192,12 @@ class DabServer():
       await response.prepare(request)
 
       # prepend the wav header to the initial response
-      next_audio_frame, audio = await handler.new_audio()
-      header = self._wav_header(False, 2, 16, handler.data.sample_rate)
+      next_audio_frame, audio = await service_controller.new_audio()
+      header = self._wav_header(False, 2, 16, service_controller.data.sample_rate)
       await response.write(header + audio)
 
       while True:
-        next_audio_frame, audio = await handler.new_audio(next_audio_frame)
+        next_audio_frame, audio = await service_controller.new_audio(next_audio_frame)
         await response.write(audio)
     except (asyncio.exceptions.CancelledError,
             asyncio.exceptions.TimeoutError,
