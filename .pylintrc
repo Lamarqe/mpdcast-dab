@@ -1,0 +1,28 @@
+[MAIN]
+extension-pkg-allow-list=dabserver.welle_io
+
+[FORMTAT]
+indent-string='  '
+max-line-length=120
+
+[MESSAGES_CONTROL]
+disable=raw-checker-failed,
+        bad-inline-option,
+        locally-disabled,
+        file-ignored,
+        suppressed-message,
+        useless-suppression,
+        deprecated-pragma,
+        use-symbolic-message-instead,
+        use-implicit-booleaness-not-comparison-to-string,
+        use-implicit-booleaness-not-comparison-to-zero,
+        missing-class-docstring,
+        missing-function-docstring,
+        unused-argument
+
+[TYPECHECK]
+ignored-classes=optparse.Values,
+                thread._local,
+                _thread._local,
+                argparse.Namespace,
+                MPDClient
