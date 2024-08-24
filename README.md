@@ -128,7 +128,6 @@ git clone https://github.com/Lamarqe/mpdcast-dab.git
 ```
 cmake -B build
 make -C build -j3
-cd ..
 ```
 
 5. Run MpdCast DAB and enjoy it
