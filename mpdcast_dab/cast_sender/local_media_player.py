@@ -16,15 +16,13 @@
 
 import logging
 import requests
-
 from pychromecast.controllers.media import MediaController
-from mpdcast_dab.cast_sender.web_sender_types import (Image, MusicTrackMediaMetadata,
-                                                      MediaInfo, QueueItem, QueueUpdateItemsRequest)
+
+from .web_sender_types import (Image, MusicTrackMediaMetadata, MediaInfo, QueueItem, QueueUpdateItemsRequest)
 
 logger = logging.getLogger(__name__)
 
 APP_LOCAL = "D29D8DD1"
-
 
 class LocalMediaPlayerController(MediaController):
   """Controller to interact with local media player app."""

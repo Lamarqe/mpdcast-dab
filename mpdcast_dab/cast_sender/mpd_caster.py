@@ -25,11 +25,11 @@ from yarl import URL
 import pychromecast
 import mpd.asyncio
 
-from mpdcast_dab.cast_sender.imageserver import ImageRequestHandler
-from mpdcast_dab.cast_sender.local_media_player import LocalMediaPlayerController, APP_LOCAL
-from mpdcast_dab.cast_sender.cast_finder import CastFinder
-from mpdcast_dab.cast_sender.tvheadend_connector import TvheadendChannel
-from mpdcast_dab.cast_sender.dabserver_connector import DabserverStation
+from .imageserver import ImageRequestHandler
+from .local_media_player import LocalMediaPlayerController, APP_LOCAL
+from .cast_finder import CastFinder
+from .tvheadend_connector import TvheadendChannel
+from .dabserver_connector import DabserverStation
 
 logger = logging.getLogger(__name__)
 

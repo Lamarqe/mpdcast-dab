@@ -27,7 +27,11 @@ from aiohttp import web
 
 from mpdcast_dab.cast_sender.output_grabber import RedirectedStreams
 from mpdcast_dab.cast_sender.mpd_caster import MpdCaster
-from mpdcast_dab.welle_python.dab_server import DabServer
+try:
+  from mpdcast_dab.welle_python.dab_server import DabServer
+  WELLIO_IMPORT_ERROR = None
+except (ModuleNotFoundError, ImportError, AttributeError) as error:
+  WELLIO_IMPORT_ERROR = error
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +81,11 @@ def prepare_dab(options, my_ip, web_app):
   if options['disable_dabserver']:
     logger.warning('Disabling DAB server functionality')
     return None
-  try:
-    dab_server = DabServer(my_ip, options['port'])
-  except (ModuleNotFoundError, ImportError, AttributeError) as error:
+  if WELLIO_IMPORT_ERROR:
     logger.warning('Failed to load DAB+ library')
-    logger.warning(str(error))
+    logger.warning(str(WELLIO_IMPORT_ERROR))
     return None
+  dab_server = DabServer(my_ip, options['port'])
   if not dab_server.initialize():
     return None
   web_app.add_routes(dab_server.get_routes())

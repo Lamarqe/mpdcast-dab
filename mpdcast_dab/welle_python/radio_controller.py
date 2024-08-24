@@ -18,9 +18,10 @@ import asyncio
 import datetime
 import logging
 import dataclasses
-from mpdcast_dab.welle_python.service_controller import ServiceController
-from mpdcast_dab.welle_python.dab_callbacks import ChannelEventPass
-from mpdcast_dab.welle_python.welle_io import ChannelEventHandler
+
+from .service_controller import ServiceController
+from .dab_callbacks import ChannelEventPass
+from .welle_io import ChannelEventHandler
 
 logger = logging.getLogger(__name__)
 

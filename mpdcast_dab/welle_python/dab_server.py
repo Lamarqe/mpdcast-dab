@@ -19,22 +19,22 @@ import json
 import logging
 from aiohttp import web
 
-from mpdcast_dab.welle_python.radio_controller import RadioController
-from mpdcast_dab.welle_python.dab_scanner import DabScanner
-from mpdcast_dab.welle_python.service_controller import UnsubscribedError
+from .radio_controller import RadioController
+from .dab_scanner import DabScanner
+from .service_controller import UnsubscribedError
+from .welle_io import DabDevice
 
 logger = logging.getLogger(__name__)
 
 class DabServer():
 
   def __init__(self, my_ip, port):
-    welle_io = __import__('mpdcast_dab.welle_python.welle_io').welle_python.welle_io
     self._my_ip                = my_ip
     self._port                 = port
     self._radio_controller     = None
     self._scanner              = None
     self._shutdown_in_progress = False
-    self._dab_device           = welle_io.DabDevice()
+    self._dab_device           = DabDevice()
 
   def initialize(self):
     if not self._dab_device.initialize():

@@ -17,7 +17,6 @@
 import urllib
 from aiohttp import web
 
-
 class ImageRequestHandler():
   URL_PREFIX = 'mpd_image/'
 

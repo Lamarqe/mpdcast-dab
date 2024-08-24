@@ -17,8 +17,9 @@
 import asyncio
 import logging
 import urllib
-from mpdcast_dab.welle_python.welle_io import ChannelEventHandler, all_channel_names
-from mpdcast_dab.welle_python.dab_callbacks import ChannelEventPass
+
+from .welle_io import ChannelEventHandler, all_channel_names
+from .dab_callbacks import ChannelEventPass
 
 logger = logging.getLogger(__name__)
 

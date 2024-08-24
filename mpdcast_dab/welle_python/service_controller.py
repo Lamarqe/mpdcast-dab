@@ -17,11 +17,11 @@
 import asyncio
 import logging
 import dataclasses
-from mpdcast_dab.welle_python.dab_callbacks import ServiceEventPass
-from mpdcast_dab.welle_python.welle_io import ServiceEventHandler
+
+from .dab_callbacks import ServiceEventPass
+from .welle_io import ServiceEventHandler
 
 logger = logging.getLogger(__name__)
-
 
 class UnsubscribedError(Exception):
   pass
