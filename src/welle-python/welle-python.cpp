@@ -175,10 +175,10 @@ class DabDevice {
     {
       device = CInputFactory::GetDevice(msgHandler, deviceName);
       if (device == nullptr)
-      {
         return false;
-      }
-      if (device->getID() == CDeviceID::NULLDEVICE) {
+
+      if (device->getID() == CDeviceID::NULLDEVICE) 
+      {
         // We are not interested in a non-functional fallback device.
         py::gil_scoped_release release;
         delete device;
@@ -186,12 +186,10 @@ class DabDevice {
         return false;
       }
 
-      if (gain == -1) {
-          device->setAgc(true);
-      }
-      else {
-          device->setGain(gain);
-      }
+      if (gain == -1)
+        device->setAgc(true);
+      else
+        device->setGain(gain);
       return true;
     }
 
@@ -201,9 +199,9 @@ class DabDevice {
     
     virtual void close_device() 
     {
-      py::gil_scoped_release release;
       if (device)
       {
+        py::gil_scoped_release release;
         delete device;
         device = nullptr;
       }
@@ -218,7 +216,6 @@ class DabDevice {
         delete rx;
         rx = nullptr;
       }
-      return;
     }
 
     virtual bool set_channel(std::string channel, ChannelEventHandler& handler, bool isScan = false)
@@ -244,24 +241,20 @@ class DabDevice {
     {
       if (!rx)
         return false;
-      else
-      {
-        py::gil_scoped_release release;
-        const Service& sadd = rx->getService(sId);
-        return rx->addServiceToDecode(handler, "", sadd);
-      }
+
+      py::gil_scoped_release release;
+      const Service& sadd = rx->getService(sId);
+      return rx->addServiceToDecode(handler, "", sadd);
     }
 
     virtual bool unsubscribe_service(uint32_t sId)
     {
       if (!rx)
         return false;
-      else
-      {
-        py::gil_scoped_release release;
-        const Service& sremove = rx->getService(sId);
-        rx->removeServiceToDecode(sremove);
-      }
+
+      py::gil_scoped_release release;
+      const Service& sremove = rx->getService(sId);
+      rx->removeServiceToDecode(sremove);
       return true;
     }
 
@@ -269,10 +262,9 @@ class DabDevice {
     {
       py::gil_scoped_release release;
       const Service& srv = rx->getService(sId);
+
       if (srv.serviceId != 0) 
-      {
         return srv.serviceLabel.utf8_label();
-      }
       else
         return std::nullopt;
     }
@@ -289,14 +281,15 @@ class DabDevice {
               sc.audioType() == AudioServiceComponentType::DABPlus)
           return true;
         }
-        return false;
       }
-      else
-        // service unknown
-        return false;
+      // service unknown
+      return false;
     }
 
-    const py::object getLock() {return lock;}
+    const py::object getLock()
+    {
+      return lock;
+    }
 };
 
 std::list<std::string> all_channel_names ()
