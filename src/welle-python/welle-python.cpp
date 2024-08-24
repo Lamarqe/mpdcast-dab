@@ -166,10 +166,10 @@ class DabDevice {
     CVirtualInput* device = nullptr;
     py::object lock;
     DabDevice(std::string deviceNameParam = "auto", int gainParam = -1):
-		   deviceName(deviceNameParam), 
-			 gain(gainParam), 
-			 msgHandler(DeviceMessageHandler()),
-       lock(py::module_::import("threading").attr("Lock")()) {}
+        deviceName(deviceNameParam), 
+        gain(gainParam), 
+        msgHandler(DeviceMessageHandler()),
+        lock(py::module_::import("threading").attr("Lock")()) {}
 
     virtual bool initialize()
     {
