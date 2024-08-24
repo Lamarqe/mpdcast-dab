@@ -25,7 +25,7 @@ import logging
 import ifaddr
 from aiohttp import web
 
-from mpdcast_dab.mpdcast.output_grabber import RedirectedStreams
+from mpdcast_dab.dabserver.output_grabber import RedirectedStreams
 from mpdcast_dab.mpdcast.mpd_caster import MpdCaster
 try:
   from mpdcast_dab.dabserver.dab_server import DabServer
