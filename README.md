@@ -126,16 +126,14 @@ git clone https://github.com/Lamarqe/mpdcast-dab.git
 4. Build MpdCast DAB (using cmake)
 
 ```
-mkdir build
-cd build
-cmake ..
-make -j3
+cmake -B build
+make -C build -j3
 cd ..
-cp build/libwelle_py.so mpdcast_dab/welle_python
 ```
 
 5. Run MpdCast DAB and enjoy it
 
 ```
-sudo ./mpdcast_dab/__main__.py
+export PYTHONPATH=$PWD
+./mpdcast_dab/__main__.py
 ```

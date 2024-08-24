@@ -25,10 +25,10 @@ import logging
 import ifaddr
 from aiohttp import web
 
-from mpdcast_dab.cast_sender.output_grabber import RedirectedStreams
-from mpdcast_dab.cast_sender.mpd_caster import MpdCaster
+from mpdcast_dab.mpdcast.output_grabber import RedirectedStreams
+from mpdcast_dab.mpdcast.mpd_caster import MpdCaster
 try:
-  from mpdcast_dab.welle_python.dab_server import DabServer
+  from mpdcast_dab.dabserver.dab_server import DabServer
   WELLIO_IMPORT_ERROR = None
 except (ModuleNotFoundError, ImportError, AttributeError) as error:
   WELLIO_IMPORT_ERROR = error

@@ -135,7 +135,7 @@ add_definitions("-DBUILD_DATE=\"${BUILD_DATE}\"")
 if(BUILD_WELLE_PY)
     set(objectName welle_io)
     pybind11_add_module(${objectName} SHARED ${welle_py_sources} ${backend_sources} ${input_sources})
-    SET_TARGET_PROPERTIES(${objectName} PROPERTIES LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_SOURCE_DIR}/mpdcast_dab/welle_python")
+    SET_TARGET_PROPERTIES(${objectName} PROPERTIES LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_SOURCE_DIR}/mpdcast_dab/dabserver")
 
     if(CMAKE_BUILD_TYPE MATCHES Debug)
       SET_TARGET_PROPERTIES(${objectName} PROPERTIES COMPILE_FLAGS "-O2")
