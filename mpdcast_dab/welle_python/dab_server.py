@@ -28,13 +28,13 @@ logger = logging.getLogger(__name__)
 class DabServer():
 
   def __init__(self, my_ip, port):
-    welle_py = __import__('mpdcast_dab.welle_python.welle_py').welle_python.welle_py
+    welle_io = __import__('mpdcast_dab.welle_python.welle_io').welle_python.welle_io
     self._my_ip                = my_ip
     self._port                 = port
     self._radio_controller     = None
     self._scanner              = None
     self._shutdown_in_progress = False
-    self._dab_device           = welle_py.DabDevice()
+    self._dab_device           = welle_io.DabDevice()
 
   def initialize(self):
     if not self._dab_device.initialize():

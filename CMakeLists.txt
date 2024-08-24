@@ -133,7 +133,7 @@ STRING(TIMESTAMP BUILD_DATE "%s" UTC)
 add_definitions("-DBUILD_DATE=\"${BUILD_DATE}\"")
 
 if(BUILD_WELLE_PY)
-    set(objectName welle_py)
+    set(objectName welle_io)
     pybind11_add_module(${objectName} SHARED ${welle_py_sources} ${backend_sources} ${input_sources})
     SET_TARGET_PROPERTIES(${objectName} PROPERTIES LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_SOURCE_DIR}/mpdcast_dab/welle_python")
 

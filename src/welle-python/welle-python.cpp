@@ -312,7 +312,7 @@ std::list<std::string> all_channel_names ()
 }
 
 
-PYBIND11_MODULE(welle_py, m) 
+PYBIND11_MODULE(welle_io, m) 
 {
   py::class_<ServiceEventHandler, PyServiceEventHandler>(m, "ServiceEventHandler")
      .def(py::init<>());

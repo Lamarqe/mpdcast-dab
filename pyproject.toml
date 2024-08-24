@@ -39,4 +39,4 @@ mpdcast_dab = "mpdcast_dab.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages =  ["mpdcast_dab"]
-artifacts = ["mpdcast_dab/welle_python/welle_py.*.so"]
+artifacts = ["mpdcast_dab/welle_python/welle_io.*.so"]
