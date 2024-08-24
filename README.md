@@ -100,6 +100,7 @@ The following libraries and their development files are needed:
 * FFTW3f
 * libfaad
 * librtlsdr
+* pybind11
 
 Debian / Ubuntu Linux
 ---
@@ -114,7 +115,7 @@ sudo apt install git build-essential cmake
 2. Install the following packages
 
 ```
-sudo apt install python3-dev libfftw3-dev libfaad-dev librtlsdr-dev
+sudo apt install python3-dev libfftw3-dev libfaad-dev librtlsdr-dev pybind11-dev
 ```
 
 3. Clone MpdCast DAB
