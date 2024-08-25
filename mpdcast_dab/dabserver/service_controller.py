@@ -34,6 +34,7 @@ class ServiceData():
     self.picture     = None
     self.label       = ''
     self.sample_rate = None
+    self.mode        = ''
 
 class ServiceController(ServiceEventHandler, ServiceEventPass):
   @dataclasses.dataclass
@@ -98,6 +99,7 @@ class ServiceController(ServiceEventHandler, ServiceEventPass):
 
   async def on_new_audio(self, audio_data, sample_rate, mode):
     self.data.sample_rate = sample_rate
+    self.data.mode = mode
     async with self._audio_buffer.data_lock:
       self._audio_buffer.data[self._audio_buffer.next_frame] = audio_data
       self._audio_buffer.next_frame = (self._audio_buffer.next_frame+1) % ServiceController.AudioBuffer.BUFFER_SIZE

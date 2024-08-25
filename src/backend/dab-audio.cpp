@@ -49,7 +49,8 @@ DabAudio::DabAudio(
         int16_t bitRate,
         ProtectionSettings protection,
         ProgrammeHandlerInterface& phi,
-        const std::string& dumpFileName) :
+        const std::string& dumpFileName,
+        bool decodeAudio) :
     myProgrammeHandler(phi),
     mscBuffer(64 * 32768),
     dumpFileName(dumpFileName)
@@ -76,7 +77,7 @@ DabAudio::DabAudio(
     }
 
     our_dabProcessor = make_unique<DecoderAdapter>(
-            myProgrammeHandler, bitRate, dabModus, dumpFileName);
+            myProgrammeHandler, bitRate, dabModus, dumpFileName, decodeAudio);
 
     running = true;
     ourThread = std::thread(&DabAudio::run, this);

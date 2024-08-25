@@ -67,7 +67,8 @@ RadioReceiver::RadioReceiver(
                 RadioControllerInterface& rci,
                 InputInterface& input,
                 RadioReceiverOptions rro,
-                int transmission_mode) :
+                int transmission_mode,
+                bool decode) :
     params(transmission_mode),
     mscHandler(params, false),
     ficHandler(rci),
@@ -76,7 +77,8 @@ RadioReceiver::RadioReceiver(
         rci,
         mscHandler,
         ficHandler,
-        rro)
+        rro),
+        decodeAudio(decode)
 { }
 
 void RadioReceiver::restart(bool doScan)
@@ -158,7 +160,7 @@ bool RadioReceiver::playProgramme(ProgrammeHandlerInterface& handler,
 
                 if (sc.audioType() == AudioServiceComponentType::DABPlus) {
                     mscHandler.addSubchannel(
-                            handler, sc.audioType(), dumpFileName, subch);
+                            handler, sc.audioType(), dumpFileName, subch, decodeAudio);
                     return true;
                 }
             }

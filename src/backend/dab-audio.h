@@ -48,7 +48,8 @@ class DabAudio : public DabVirtual
                   int16_t bitRate,
                   ProtectionSettings protection,
                   ProgrammeHandlerInterface& phi,
-                  const std::string& dumpFileName);
+                  const std::string& dumpFileName,
+                  bool decodeAudio);
         virtual ~DabAudio(void);
         DabAudio(const DabAudio&) = delete;
         DabAudio& operator=(const DabAudio&) = delete;

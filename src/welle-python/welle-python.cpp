@@ -36,6 +36,7 @@ public:
   virtual void onNewDynamicLabel(const std::string& label) override {}
   virtual void onMOT(const mot_file_t& mot_file) override {}
   virtual void onPADLengthError(size_t announced_xpad_len, size_t xpad_len) override {}
+  virtual void ProcessUntouchedStream(const uint8_t* /*data*/, size_t /*len*/, size_t /*duration_ms*/) override {}
 };
 
 class PyServiceEventHandler: public ServiceEventHandler {
@@ -44,6 +45,16 @@ protected:
 
 public:
   PyServiceEventHandler(): loop(py::module_::import("asyncio").attr("get_event_loop")())  {}
+
+  virtual void ProcessUntouchedStream(const uint8_t* audioData, size_t len, size_t duration_ms) override 
+  {
+    py::handle data;
+    {
+      py::gil_scoped_acquire acquire;
+      data = PyBytes_FromStringAndSize((const char*)audioData, len);
+    }
+    RUN_IN_ASYNC(ServiceEventHandler, "on_new_audio", data, 0, "aac");    
+  }
 
   virtual void onNewAudio(std::vector<int16_t>&& audioData, int sampleRate, const std::string& mode) override
   {
@@ -160,12 +171,14 @@ class DabDevice {
   public:
     std::string deviceName;
     int gain;
+    bool decodeAudio;
     DeviceMessageHandler msgHandler;
     CVirtualInput* device = nullptr;
     py::object lock;
-    DabDevice(std::string deviceNameParam = "auto", int gainParam = -1):
-        deviceName(deviceNameParam), 
-        gain(gainParam), 
+    DabDevice(std::string deviceNameParam = "auto", int gainParam = -1, bool decodeAudioParam = true):
+        deviceName(deviceNameParam),
+        gain(gainParam),
+        decodeAudio(decodeAudioParam),
         msgHandler(DeviceMessageHandler()),
         lock(py::module_::import("threading").attr("Lock")()) {}
 
@@ -229,7 +242,7 @@ class DabDevice {
 
       RadioReceiverOptions rro;
       rro.decodeTII = true;
-      rx = new RadioReceiver(handler, *device, rro);
+      rx = new RadioReceiver(handler, *device, rro, 1, decodeAudio);
 
       rx->restart(isScan);
       return true;
@@ -312,7 +325,7 @@ PYBIND11_MODULE(welle_io, m)
      .def(py::init<>());
 
   py::class_<DabDevice>(m, "DabDevice")
-     .def(py::init<const std::string&, int>(), py::arg("device_name") = "auto", py::arg("gain") = -1)
+     .def(py::init<const std::string&, int, bool>(), py::arg("device_name") = "auto", py::arg("gain") = -1, py::kw_only(), py::arg("decode_audio") = true)
      .def("initialize", &DabDevice::initialize)
      .def("close_device", &DabDevice::close_device)
      .def("set_channel", &DabDevice::set_channel, py::arg("channel"), py::arg("handler"), py::arg("isScan") = false)

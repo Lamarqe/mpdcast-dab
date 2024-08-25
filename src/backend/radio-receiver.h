@@ -55,7 +55,8 @@ class RadioReceiver {
                 RadioControllerInterface& rci,
                 InputInterface& input,
                 RadioReceiverOptions rro,
-                int transmission_mode = 1);
+                int transmission_mode = 1,
+                bool decodeAudio = true);
 
         /* Restart the receiver, and specify if we want
          * to scan or receive. */
@@ -113,6 +114,7 @@ class RadioReceiver {
         MscHandler mscHandler;
         FicHandler ficHandler;
         OFDMProcessor ofdmProcessor;
+        bool decodeAudio;
 };
 
 #endif

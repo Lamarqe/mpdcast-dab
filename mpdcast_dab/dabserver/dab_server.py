@@ -28,13 +28,14 @@ logger = logging.getLogger(__name__)
 
 class DabServer():
 
-  def __init__(self, my_ip, port):
+  def __init__(self, my_ip, port, decode = True):
     self._my_ip                = my_ip
     self._port                 = port
     self._radio_controller     = None
     self._scanner              = None
     self._shutdown_in_progress = False
-    self._dab_device           = DabDevice()
+    self._dab_device           = DabDevice(decode_audio = decode)
+    self._audio_mimetype       = 'wav' if decode else 'aac'
 
   def initialize(self):
     if not self._dab_device.initialize():
@@ -188,12 +189,16 @@ class DabServer():
       response = web.StreamResponse(
         status=200,
         reason='OK',
-        headers={'Content-Type': 'audio/wav','Cache-Control': 'no-cache', 'Connection': 'Close'})
+        headers={'Content-Type': 'audio/' + self._audio_mimetype,'Cache-Control': 'no-cache', 'Connection': 'Close'})
       await response.prepare(request)
 
       # prepend the wav header to the initial response
       next_audio_frame, audio = await service_controller.new_audio()
-      header = self._wav_header(False, 2, 16, service_controller.data.sample_rate)
+      if self._audio_mimetype == 'wav':
+        header = self._wav_header(False, 2, 16, service_controller.data.sample_rate)
+      else:
+        header = b''
+
       await response.write(header + audio)
 
       while True:

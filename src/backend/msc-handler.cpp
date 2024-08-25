@@ -62,7 +62,8 @@ bool MscHandler::addSubchannel(
         ProgrammeHandlerInterface& handler,
         AudioServiceComponentType ascty,
         const std::string& dumpFileName,
-        const Subchannel& sub)
+        const Subchannel& sub,
+        bool decodeAudio)
 {
     std::lock_guard<std::mutex> lock(mutex);
 
@@ -81,7 +82,8 @@ bool MscHandler::addSubchannel(
                 sub.bitrate(),
                 sub.protectionSettings,
                 handler,
-                dumpFileName);
+                dumpFileName,
+                decodeAudio);
 
      /* TODO dealing with data
       s.dabHandler = std::make_shared<DabData>(radioInterface,

@@ -43,7 +43,8 @@ class DecoderAdapter: public DabProcessor, public SubchannelSinkObserver, public
         DecoderAdapter(ProgrammeHandlerInterface& mr,
                      int16_t bitRate,
                      AudioServiceComponentType &dabModus,
-                     const std::string& dumpFileName);
+                     const std::string& dumpFileName,
+                     bool decodeAudio);
 
         virtual void addtoFrame(uint8_t *v);
 

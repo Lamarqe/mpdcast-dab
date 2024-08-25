@@ -55,7 +55,8 @@ class MscHandler
                 ProgrammeHandlerInterface& handler,
                 AudioServiceComponentType ascty,
                 const std::string& dumpFileName,
-                const Subchannel& sub);
+                const Subchannel& sub,
+                bool decodeAudio);
 
         bool removeSubchannel(const Subchannel& sub);
 

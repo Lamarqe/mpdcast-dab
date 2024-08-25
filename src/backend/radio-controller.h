@@ -38,6 +38,7 @@
 #include <string>
 #include <complex>
 #include "dab-constants.h"
+#include "backend/subchannel_sink.h"
 
 struct dab_date_time_t {
     int year = 0;
@@ -134,7 +135,7 @@ class RadioControllerInterface {
 
 /* A Programme Handler is associated to each tuned programme in the ensemble.
  */
-class ProgrammeHandlerInterface {
+class ProgrammeHandlerInterface: public UntouchedStreamConsumer {
     public:
         /* Count the number of frame errors from the MP2, AAC or data
          * decoder.  */

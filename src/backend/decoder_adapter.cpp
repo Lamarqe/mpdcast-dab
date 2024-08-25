@@ -27,13 +27,17 @@
 #include <vector>
 #include "decoder_adapter.h"
 
-DecoderAdapter::DecoderAdapter(ProgrammeHandlerInterface &mr, int16_t bitRate, AudioServiceComponentType &dabModus, const std::string &dumpFileName):
+DecoderAdapter::DecoderAdapter(ProgrammeHandlerInterface &mr, int16_t bitRate, AudioServiceComponentType &dabModus, const std::string &dumpFileName, bool decodeAudio):
     bitRate(bitRate),
     myInterface(mr),
     padDecoder(this, true)
 {
     if (dabModus == AudioServiceComponentType::DABPlus)
-        decoder = std::make_unique<SuperframeFilter>(this, true, false);
+    {
+        decoder = std::make_unique<SuperframeFilter>(this, decodeAudio, false);
+        if (!decodeAudio)
+            decoder->AddUntouchedStreamConsumer(&mr);
+    }
     else
         throw std::runtime_error("DecoderAdapter: Unknown service component");
 
