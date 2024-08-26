@@ -344,6 +344,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
         # continue to ignore playback if we ignored until now and MPD is still playing
         ignore_current_playback = bool(ignore_current_playback and mpd_is_playing)
+        ignore_current_playback = False
         if ignore_current_playback:
           # Dont process
           continue
@@ -365,6 +366,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       # Connection to MPD lost
       self._handle_mpd_stop_play()
 
-  def get_routes(self):
+  def get_routes(self, prefix):
     return (self._mpd.image_cache.get_routes()
-         + [web.static(CAST_PATH, '/usr/share/mpdcast-dab/cast_receiver')])
+         + [web.static(CAST_PATH, prefix + '/cast_receiver')])

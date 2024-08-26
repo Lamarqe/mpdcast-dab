@@ -46,8 +46,8 @@ class DabServer():
     self._scanner    = DabScanner(self._dab_device)
     return True
 
-  def get_routes(self):
-    return [web.get(r'', self.get_webui),
+  def get_routes(self, prefix):
+    return [web.get(r'', self.webui(prefix)),
             web.get('/DAB.m3u8', self.get_scanner_playlist),
             web.get('/get_scanner_details', self.get_scanner_details),
             web.post('/start_scan', self.start_scan),
@@ -216,5 +216,7 @@ class DabServer():
     # Make sure above that this line remains unreachable
     raise web.HTTPInternalServerError()
 
-  async def get_webui(self, request):
-    return web.FileResponse('/usr/share/mpdcast-dab/webui/index.htm')
+  def webui(self, prefix):
+    async def get_webui(request):
+      return web.FileResponse(prefix + '/webui/index.htm')
+    return get_webui

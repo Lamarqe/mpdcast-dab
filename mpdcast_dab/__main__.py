@@ -67,17 +67,17 @@ def get_args():
   return vars(parser.parse_args())
 
 
-def prepare_cast(options, my_ip, web_app):
+def prepare_cast(options, my_ip, web_app, prefix):
   if options['disable_mpdcast']:
     logger.warning('Disabling MPD cast functionality')
     return None
   mpd_caster = MpdCaster(options['conf'], my_ip, options['port'])
   if not mpd_caster.initialize():
     return None
-  web_app.add_routes(mpd_caster.get_routes())
+  web_app.add_routes(mpd_caster.get_routes(prefix))
   return mpd_caster
 
-def prepare_dab(options, my_ip, web_app):
+def prepare_dab(options, my_ip, web_app, prefix):
   if options['disable_dabserver']:
     logger.warning('Disabling DAB server functionality')
     return None
@@ -88,7 +88,7 @@ def prepare_dab(options, my_ip, web_app):
   dab_server = DabServer(my_ip, options['port'])
   if not dab_server.initialize():
     return None
-  web_app.add_routes(dab_server.get_routes())
+  web_app.add_routes(dab_server.get_routes(prefix))
   return dab_server
 
 async def setup_webserver(runner, port):
@@ -101,7 +101,7 @@ async def setup_webserver(runner, port):
     logger.error(str(ex))
     return False
 
-def main():
+def main(run_from_local=False):
   options = get_args()
 
   redirectors = RedirectedStreams('Welle.io')
@@ -121,9 +121,9 @@ def main():
   loop = asyncio.new_event_loop()
   asyncio.set_event_loop(loop)
   web_app = web.Application()
-
-  mpd_caster = prepare_cast(options, my_ip, web_app)
-  dab_server = prepare_dab (options, my_ip, web_app)
+  prefix = 'src' if run_from_local else '/usr/share/mpdcast-dab'
+  mpd_caster = prepare_cast(options, my_ip, web_app, prefix)
+  dab_server = prepare_dab (options, my_ip, web_app, prefix)
 
   if not mpd_caster and not dab_server:
     logger.error('Fatal. Both MpdCast and DAB processing failed to initialize. Exiting.')
@@ -167,4 +167,4 @@ async def cleanup(mpd_caster, dab_server, runner):
   await runner.cleanup()
 
 if __name__ == '__main__':
-  main()
+  main(True)
