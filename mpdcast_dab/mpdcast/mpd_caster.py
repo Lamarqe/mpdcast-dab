@@ -344,7 +344,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
         # continue to ignore playback if we ignored until now and MPD is still playing
         ignore_current_playback = bool(ignore_current_playback and mpd_is_playing)
-        ignore_current_playback = False
         if ignore_current_playback:
           # Dont process
           continue
