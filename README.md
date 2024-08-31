@@ -127,6 +127,7 @@ git clone https://github.com/Lamarqe/mpdcast-dab.git
 4. Build MpdCast DAB (using cmake)
 
 ```
+cd mpdcast-dab
 cmake -B build
 make -C build -j3
 ```
