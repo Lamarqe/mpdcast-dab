@@ -13,7 +13,7 @@ MpdCast DAB uses the DAB+ implementation of welle.io (https://github.com/Albrech
 Table of contents
 ====
 
-  * [Download](#download)
+  * [Installation](#installation)
   * [Configuration](#configuration)
   * [Usage](#usage)
     * [Command-line parameters](#command-line-parameters) 
@@ -21,10 +21,10 @@ Table of contents
   * [Supported Hardware](#supported-hardware)
   * [Building](#building)
 
-Download
+Installation
 ========
-### Stable binaries
-* **Debian** or **Ubuntu** 24.04+
+### Pre-built packages for **Debian** or **Ubuntu** 24.04+ 
+(commands to be executed with root permissions)
   * `add-apt-repository ppa:lamarqe/ppa`
   * `apt update`
   * `apt install mpdcast-dab`
