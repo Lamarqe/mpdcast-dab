@@ -50,13 +50,13 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
       self.ui_status['scanner_status']      = 'Scan started succesfully'
     return { }
 
-  def get_playlist(self, ip, port):
+  def get_playlist(self, url):
     playlist = '#EXTM3U\n'
     for channel_name, channel_details in self.scan_results.items():
       for service_details in channel_details.values():
         if 'name' in service_details:
           playlist+= '#EXTINF:-1,' + service_details['name'] + '\n'
-          playlist+= 'http://' + ip + ':' + str(port)
+          playlist+= 'http://' + url.host + ':' + str(url.port)
           playlist+= '/stream/' + channel_name
           playlist+= '/' + urllib.parse.quote(service_details['name']) + '\n'
     return playlist
@@ -76,7 +76,7 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
       self.ui_status['progress_text'] = str(progress) + '% (' + str(scanned_channels)
       self.ui_status['progress_text']+= ' of ' + str(number_of_channels) + ' channels)'
       self.ui_status['progress_text']+= ' Found ' + str(discovered_services) + ' radio services.'
-      self.ui_status['scanner_status'] = 'Scan in progress. Currently scanning channel ' 
+      self.ui_status['scanner_status'] = 'Scan in progress. Currently scanning channel '
       self.ui_status['scanner_status']+= self._dab_device.get_channel() + '.'
     else:
       self.ui_status['progress_text'] = '&nbsp;'

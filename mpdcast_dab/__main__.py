@@ -90,7 +90,7 @@ def prepare_dab(options, web_app, prefix):
     logger.warning('Failed to load DAB+ library')
     logger.warning(str(WELLIO_IMPORT_ERROR))
     return None
-  dab_server = DabServer(options['port'])
+  dab_server = DabServer()
   if not dab_server.initialize():
     return None
   web_app.add_routes(dab_server.get_routes(prefix))
