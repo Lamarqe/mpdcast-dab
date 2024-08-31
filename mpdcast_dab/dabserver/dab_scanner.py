@@ -76,6 +76,8 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
       self.ui_status['progress_text'] = str(progress) + '% (' + str(scanned_channels)
       self.ui_status['progress_text']+= ' of ' + str(number_of_channels) + ' channels)'
       self.ui_status['progress_text']+= ' Found ' + str(discovered_services) + ' radio services.'
+      self.ui_status['scanner_status'] = 'Scan in progress. Currently scanning channel ' 
+      self.ui_status['scanner_status']+= self._dab_device.get_channel() + '.'
     else:
       self.ui_status['progress_text'] = '&nbsp;'
       self.ui_status['progress'] = 0

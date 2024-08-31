@@ -248,6 +248,23 @@ class DabDevice {
       return true;
     }
     
+    virtual std::optional<std::string> get_channel()
+    {
+      if (!rx)
+        return std::nullopt;
+
+      int frequency = device->getFrequency();
+      try
+      {
+        Channels channels;
+        return channels.getChannelForFrequency(frequency);
+      }
+      catch (std::out_of_range& e)
+      {
+        return std::nullopt;
+      }
+    }
+
     virtual bool subscribe_service(ServiceEventHandler& handler, uint32_t sId)
     {
       if (!rx)
@@ -271,6 +288,9 @@ class DabDevice {
 
     virtual std::optional<std::string> get_service_name(uint32_t sId)
     {
+      if (!rx)
+        return std::nullopt;
+
       py::gil_scoped_release release;
       const Service& srv = rx->getService(sId);
 
@@ -329,6 +349,7 @@ PYBIND11_MODULE(welle_io, m)
      .def("initialize", &DabDevice::initialize)
      .def("close_device", &DabDevice::close_device)
      .def("set_channel", &DabDevice::set_channel, py::arg("channel"), py::arg("handler"), py::arg("isScan") = false)
+     .def("get_channel", &DabDevice::get_channel)
      .def("reset_channel", &DabDevice::reset_channel)
      .def("subscribe_service", &DabDevice::subscribe_service)
      .def("unsubscribe_service", &DabDevice::unsubscribe_service)
