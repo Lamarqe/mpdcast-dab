@@ -66,18 +66,23 @@ def get_args():
   parser.add_argument('-v', '--verbose', help= 'Enable verbose output', action='store_true')
   return vars(parser.parse_args())
 
-
-def prepare_cast(options, my_ip, web_app, prefix):
+def prepare_cast(options, web_app, prefix):
   if options['disable_mpdcast']:
     logger.warning('Disabling MPD cast functionality')
     return None
+
+  my_ip = get_first_ipv4_address()
+  if not my_ip:
+    logger.error('Could not retrieve local IP address')
+    return None
+
   mpd_caster = MpdCaster(options['conf'], my_ip, options['port'])
   if not mpd_caster.initialize():
     return None
   web_app.add_routes(mpd_caster.get_routes(prefix))
   return mpd_caster
 
-def prepare_dab(options, my_ip, web_app, prefix):
+def prepare_dab(options, web_app, prefix):
   if options['disable_dabserver']:
     logger.warning('Disabling DAB server functionality')
     return None
@@ -85,7 +90,7 @@ def prepare_dab(options, my_ip, web_app, prefix):
     logger.warning('Failed to load DAB+ library')
     logger.warning(str(WELLIO_IMPORT_ERROR))
     return None
-  dab_server = DabServer(my_ip, options['port'])
+  dab_server = DabServer(options['port'])
   if not dab_server.initialize():
     return None
   web_app.add_routes(dab_server.get_routes(prefix))
@@ -109,21 +114,12 @@ def main(run_from_local=False):
     redirectors.redirect_out_streams()
   update_logger_config(options['verbose'])
 
-  my_ip = get_first_ipv4_address()
-
-  if not my_ip:
-    logger.warning('Could not retrieve local IP address')
-    # Disable Cast processing as it does not work without knowing the IP
-    options['disable_mpdcast'] = True
-    # Set up fallback that can be used for DAB playlist creation
-    my_ip = '127.0.0.1'
-
   loop = asyncio.new_event_loop()
   asyncio.set_event_loop(loop)
   web_app = web.Application()
   prefix = 'src' if run_from_local else '/usr/share/mpdcast-dab'
-  mpd_caster = prepare_cast(options, my_ip, web_app, prefix)
-  dab_server = prepare_dab (options, my_ip, web_app, prefix)
+  mpd_caster = prepare_cast(options, web_app, prefix)
+  dab_server = prepare_dab (options, web_app, prefix)
 
   if not mpd_caster and not dab_server:
     logger.error('Fatal. Both MpdCast and DAB processing failed to initialize. Exiting.')

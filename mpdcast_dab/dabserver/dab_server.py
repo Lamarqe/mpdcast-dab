@@ -28,8 +28,7 @@ logger = logging.getLogger(__name__)
 
 class DabServer():
 
-  def __init__(self, my_ip, port, decode = True):
-    self._my_ip                = my_ip
+  def __init__(self, port, decode = True):
     self._port                 = port
     self._radio_controller     = None
     self._scanner              = None
@@ -59,7 +58,7 @@ class DabServer():
             web.get(r'/label/next/{channel:[0-9]{1,2}[A-Z]}/{service:.+}', self.get_next_label)]
 
   async def get_scanner_playlist(self, request):
-    resp = self._scanner.get_playlist(self._my_ip, self._port)
+    resp = self._scanner.get_playlist(request.url.host, self._port)
     return web.Response(body = resp, content_type = 'audio/x-mpegurl')
 
   async def start_scan(self, request):
