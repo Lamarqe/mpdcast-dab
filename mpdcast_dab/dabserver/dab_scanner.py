@@ -56,8 +56,7 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
       for service_details in channel_details.values():
         if 'name' in service_details:
           playlist+= '#EXTINF:-1,' + service_details['name'] + '\n'
-          playlist+= 'http://' + url.host + ':' + str(url.port)
-          playlist+= '/stream/' + channel_name
+          playlist+= str(url) + channel_name
           playlist+= '/' + urllib.parse.quote(service_details['name']) + '\n'
     return playlist
 

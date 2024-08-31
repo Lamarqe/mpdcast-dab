@@ -57,7 +57,7 @@ class DabServer():
             web.get(r'/label/next/{channel:[0-9]{1,2}[A-Z]}/{service:.+}', self.get_next_label)]
 
   async def get_scanner_playlist(self, request):
-    resp = self._scanner.get_playlist(request.url)
+    resp = self._scanner.get_playlist(request.url.with_path('/stream/').with_name(''))
     return web.Response(body = resp, content_type = 'audio/x-mpegurl')
 
   async def start_scan(self, request):
