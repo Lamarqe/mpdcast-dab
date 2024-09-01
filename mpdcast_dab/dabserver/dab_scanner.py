@@ -16,7 +16,6 @@
 
 import asyncio
 import logging
-import urllib
 
 from .welle_io import ChannelEventHandler, all_channel_names
 from .dab_callbacks import ChannelEventPass
@@ -50,14 +49,14 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
       self.ui_status['scanner_status']      = 'Scan started succesfully'
     return { }
 
-  def get_playlist(self, url):
+  def get_playlist(self, base_url):
     playlist = '#EXTM3U\n'
     for channel_name, channel_details in self.scan_results.items():
       for service_details in channel_details.values():
         if 'name' in service_details:
+          stream_url = base_url / channel_name / service_details['name']
           playlist+= '#EXTINF:-1,' + service_details['name'] + '\n'
-          playlist+= str(url) + channel_name
-          playlist+= '/' + urllib.parse.quote(service_details['name']) + '\n'
+          playlist+= str(stream_url) + '\n'
     return playlist
 
   def status(self):
