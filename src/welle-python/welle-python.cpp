@@ -232,7 +232,6 @@ class DabDevice {
       device->reset();
 
       RadioReceiverOptions rro;
-      rro.decodeTII = true;
       rx = new RadioReceiver(handler, *device, rro, 1, decodeAudio);
 
       rx->restart(isScan);
