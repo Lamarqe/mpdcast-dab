@@ -49,14 +49,14 @@ public:
   virtual void ProcessUntouchedStream(const uint8_t* audioData, size_t len, size_t duration_ms) override 
   {
     py::gil_scoped_acquire acquire;
-    py::bytes data = py::reinterpret_steal<py::bytes>(PyBytes_FromStringAndSize((const char*)audioData, len));
+    py::bytes data((const char*)audioData, len);
     RUN_IN_ASYNC(ServiceEventHandler, "on_new_audio", data, 0, "aac");    
   }
 
   virtual void onNewAudio(std::vector<int16_t>&& audioData, int sampleRate, const std::string& mode) override
   {
     py::gil_scoped_acquire acquire;
-    py::bytes data = py::reinterpret_steal<py::bytes>(PyBytes_FromStringAndSize((const char*)audioData.data(), 2*audioData.size()));
+    py::bytes data((const char*)audioData.data(), 2*audioData.size());
     RUN_IN_ASYNC(ServiceEventHandler, "on_new_audio", data, sampleRate, mode);
   }
 
@@ -77,7 +77,7 @@ public:
       default:   mime_type = "unknown";
     }
     py::gil_scoped_acquire acquire;
-    py::bytes data = py::reinterpret_steal<py::bytes>(PyBytes_FromStringAndSize((const char*)mot_file.data.data(), mot_file.data.size()));
+    py::bytes data((const char*)mot_file.data.data(), mot_file.data.size());
     RUN_IN_ASYNC(ServiceEventHandler, "on_mot", data, mime_type, mot_file.content_name);
   }  
 };
