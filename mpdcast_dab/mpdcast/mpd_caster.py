@@ -18,6 +18,7 @@ import asyncio
 import re
 import logging
 import dataclasses
+from typing import List
 import tomllib
 import zeroconf
 from aiohttp import web
@@ -365,6 +366,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       # Connection to MPD lost
       self._handle_mpd_stop_play()
 
-  def get_routes(self, prefix) -> List[AbstractRouteDef]:
+  def get_routes(self, prefix) -> List[web.AbstractRouteDef]:
     return (self._mpd.image_cache.get_routes()
          + [web.static(CAST_PATH, prefix + '/cast_receiver')])

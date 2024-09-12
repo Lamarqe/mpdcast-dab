@@ -17,6 +17,7 @@
 import asyncio
 import json
 import logging
+from typing import List
 from aiohttp import web
 
 from .radio_controller import RadioController
@@ -44,7 +45,7 @@ class DabServer():
     self._scanner    = DabScanner(self._dab_device)
     return True
 
-  def get_routes(self, prefix) -> List[AbstractRouteDef]:
+  def get_routes(self, prefix) -> List[web.AbstractRouteDef]:
     return [web.get(r'', self.webui(prefix)),
             web.get('/DAB.m3u8', self.get_scanner_playlist),
             web.get('/get_scanner_details', self.get_scanner_details),

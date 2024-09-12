@@ -22,10 +22,10 @@ import signal
 import asyncio
 import argparse
 import logging
-import ifaddr
 import types
-from aiohttp import web
 from typing import Any
+import ifaddr
+from aiohttp import web
 
 from mpdcast_dab.dabserver.output_grabber import RedirectedStreams
 from mpdcast_dab.mpdcast.mpd_caster import MpdCaster
