@@ -76,14 +76,14 @@ class OutputGrabber:
       self.restore_stream()
 
 class RedirectedStreams():
-  def __init__(self, log_name):
+  def __init__(self, log_name) -> None:
     self._stdout_grabber = OutputGrabber(sys.stdout, log_name, logging.Logger.error)
     self._stderr_grabber = OutputGrabber(sys.stderr, log_name, logging.Logger.warning)
 
-  def redirect_out_streams(self):
+  def redirect_out_streams(self) -> None:
     sys.stdout = self._stdout_grabber.redirect_stream()
     sys.stderr = self._stderr_grabber.redirect_stream()
 
-  def restore_out_streams(self):
+  def restore_out_streams(self) -> None:
     self._stdout_grabber.cleanup()
     self._stderr_grabber.cleanup()

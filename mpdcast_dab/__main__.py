@@ -23,7 +23,9 @@ import asyncio
 import argparse
 import logging
 import ifaddr
+import types
 from aiohttp import web
+from typing import Any
 
 from mpdcast_dab.dabserver.output_grabber import RedirectedStreams
 from mpdcast_dab.mpdcast.mpd_caster import MpdCaster
@@ -35,16 +37,17 @@ except (ModuleNotFoundError, ImportError, AttributeError) as error:
 
 logger = logging.getLogger(__name__)
 
-def get_first_ipv4_address():
+def get_first_ipv4_address() -> str | None:
   for iface in ifaddr.get_adapters():
     for addr in iface.ips:
       # Filter out link-local addresses.
       if addr.is_IPv4:
-        if not (addr.ip.startswith('169.254.') or addr.ip == '127.0.0.1'):
-          return addr.ip
+        ip_string = str(addr.ip)
+        if not (ip_string.startswith('169.254.') or ip_string == '127.0.0.1'):
+          return ip_string
   return None
 
-def update_logger_config(verbose):
+def update_logger_config(verbose: bool) -> None:
   internal_log_level = logging.INFO    if verbose else logging.WARNING
   external_log_level = logging.WARNING if verbose else logging.ERROR
   logging.basicConfig(format='%(name)s - %(levelname)s: %(message)s',
@@ -56,7 +59,7 @@ def update_logger_config(verbose):
   logging.getLogger('Welle.io').setLevel(external_log_level)
   logging.getLogger(__name__).setLevel(logging.INFO)
 
-def get_args():
+def get_args() -> dict[str, Any]:
   parser = argparse.ArgumentParser(description='MPD Cast Device Agent',
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument('-p', '--port', help= 'Communication port to use.', type=int, default=8864)
@@ -66,7 +69,7 @@ def get_args():
   parser.add_argument('-v', '--verbose', help= 'Enable verbose output', action='store_true')
   return vars(parser.parse_args())
 
-def prepare_cast(options, web_app, prefix):
+def prepare_cast(options: dict[str, Any], web_app: web.Application, prefix: str) -> MpdCaster | None:
   if options['disable_mpdcast']:
     logger.warning('Disabling MPD cast functionality')
     return None
@@ -82,7 +85,7 @@ def prepare_cast(options, web_app, prefix):
   web_app.add_routes(mpd_caster.get_routes(prefix))
   return mpd_caster
 
-def prepare_dab(options, web_app, prefix):
+def prepare_dab(options: dict[str, Any], web_app: web.Application, prefix: str) -> DabServer | None:
   if options['disable_dabserver']:
     logger.warning('Disabling DAB server functionality')
     return None
@@ -96,7 +99,7 @@ def prepare_dab(options, web_app, prefix):
   web_app.add_routes(dab_server.get_routes(prefix))
   return dab_server
 
-async def setup_webserver(runner, port):
+async def setup_webserver(runner: web.AppRunner, port: int) -> bool:
   try:
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port, shutdown_timeout=0.1)
@@ -106,7 +109,7 @@ async def setup_webserver(runner, port):
     logger.error(str(ex))
     return False
 
-def main(run_from_local=False):
+def main(run_from_local: bool = False) -> None:
   options = get_args()
 
   redirectors = RedirectedStreams('Welle.io')
@@ -137,13 +140,13 @@ def main(run_from_local=False):
 
   logger.info('Succesfully initialized MpdCast DAB')
   # prepare the main loop
-  async def mainloop():
+  async def mainloop() -> None:
     while True:
       await asyncio.sleep(3600)
   mainloop_task = loop.create_task(mainloop())
 
   # set up cleanup handler...
-  def sigterm_handler(signal_number, stack_frame):
+  def sigterm_handler(signal_number: int, stack_frame: types.FrameType | None) -> None:
     mainloop_task.cancel()
   # ... which handles SIGTERM
   signal.signal(signal.SIGTERM, sigterm_handler)
@@ -154,7 +157,7 @@ def main(run_from_local=False):
     loop.run_until_complete(cleanup(mpd_caster, dab_server, runner))
     redirectors.restore_out_streams()
 
-async def cleanup(mpd_caster, dab_server, runner):
+async def cleanup(mpd_caster: MpdCaster | None, dab_server: DabServer | None, runner: web.AppRunner) -> None:
   logger.info('Stopping MpdCast DAB as requested')
   if mpd_caster:
     await mpd_caster.stop()

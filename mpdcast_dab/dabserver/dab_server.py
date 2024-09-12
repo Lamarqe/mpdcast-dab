@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 
 class DabServer():
 
-  def __init__(self, decode = True):
+  def __init__(self, decode = True) -> None:
     self._radio_controller     = None
     self._scanner              = None
     self._shutdown_in_progress = False
     self._dab_device           = DabDevice(decode_audio = decode)
     self._audio_mimetype       = 'wav' if decode else 'aac'
 
-  def initialize(self):
+  def initialize(self) -> bool:
     if not self._dab_device.initialize():
       logger.warning('No DAB device available. DAB server will be disabled.')
       return False
@@ -44,7 +44,7 @@ class DabServer():
     self._scanner    = DabScanner(self._dab_device)
     return True
 
-  def get_routes(self, prefix):
+  def get_routes(self, prefix) -> List[AbstractRouteDef]:
     return [web.get(r'', self.webui(prefix)),
             web.get('/DAB.m3u8', self.get_scanner_playlist),
             web.get('/get_scanner_details', self.get_scanner_details),
@@ -72,7 +72,7 @@ class DabServer():
     resp = self._scanner.status()
     return web.Response(body = json.dumps(resp), content_type = 'application/json')
 
-  async def stop(self):
+  async def stop(self) -> None:
     self._shutdown_in_progress = True
     self._radio_controller.stop()
     await self._scanner.stop()

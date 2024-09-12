@@ -45,7 +45,7 @@ class MpdConfig():
     self.streaming_port = None
     self.device_name    = None
 
-  def initialize(self):
+  def initialize(self) -> bool:
     try:
       self.load()
       self.read()
@@ -128,7 +128,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     dab_label: asyncio.Task = None
     dab_image: asyncio.Task = None
 
-  def __init__(self, config_filename, my_ip, port):
+  def __init__(self, config_filename, my_ip, port) -> None:
     self._mpd             = self.MpdStatus()
     self._updater         = self.UpdateTasks()
     self._cast            = self.CastStatus()
@@ -142,10 +142,10 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     self._dabserver_current_station = None
     self._main_task       = None
 
-  def initialize(self):
+  def initialize(self) -> bool:
     return self._mpd.config.initialize()
 
-  async def start(self):
+  async def start(self) -> None:
     loop = asyncio.get_running_loop()
     self._main_task = loop.create_task(self.run())
 
@@ -167,7 +167,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
         self._handle_mpd_stop_play()
         raise
 
-  async def stop(self):
+  async def stop(self) -> None:
     self._main_task.cancel()
     try:
       await self._main_task
@@ -365,6 +365,6 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       # Connection to MPD lost
       self._handle_mpd_stop_play()
 
-  def get_routes(self, prefix):
+  def get_routes(self, prefix) -> List[AbstractRouteDef]:
     return (self._mpd.image_cache.get_routes()
          + [web.static(CAST_PATH, prefix + '/cast_receiver')])
