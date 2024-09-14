@@ -16,30 +16,41 @@
 
 import asyncio
 import logging
+import typing
 
-from .welle_io import ChannelEventHandler, all_channel_names
+import yarl
+
+from .welle_io import DabDevice, ChannelEventHandler, all_channel_names
 from .dab_callbacks import ChannelEventPass
 
 logger = logging.getLogger(__name__)
 
+UiStatus = typing.TypedDict('UiStatus', {'scanner_status': str,
+                                         'download_ready': bool,
+                                         'is_scan_active': bool,
+                                         'progress': int,
+                                         'progress_text': str})
+
 class DabScanner(ChannelEventHandler, ChannelEventPass):
   SERVICE_DISCOVERY_TIMEOUT = 10
 
-  def __init__(self, device):
+  def __init__(self, device: DabDevice) -> None:
     ChannelEventHandler.__init__(self)
-    self._dab_device = device
-    self._is_signal = None
-    self._scanner_task = None
+    self._dab_device: DabDevice = device
+    self._is_signal: bool | None = None
+    self._scanner_task: asyncio.Task | None = None
     self._all_channel_names = all_channel_names()
-    self.scan_results = {}
-    self.ui_status = {}
-    self.ui_status['scanner_status'] = '&nbsp;'
-    self.ui_status['download_ready'] = False
+    self.scan_results: dict[str, dict[int, dict[str, str]]] = {}
+    self.ui_status: UiStatus = {'scanner_status': '&nbsp;', 
+                                'download_ready': False,
+                                'is_scan_active': False,
+                                'progress': 0,
+                                'progress_text': '&nbsp;'}
 
     # internal update notification event
     self._signal_presence_event = asyncio.Event()
 
-  async def start_scan(self):
+  async def start_scan(self) -> dict:
     if self._scanner_task:
       self.ui_status['scanner_status']      = 'Scan in progress. No new scan possible.'
     elif not self._dab_device.lock.acquire(blocking=False):
@@ -49,7 +60,7 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
       self.ui_status['scanner_status']      = 'Scan started succesfully'
     return { }
 
-  def get_playlist(self, base_url):
+  def get_playlist(self, base_url: yarl.URL) -> str:
     playlist = '#EXTM3U\n'
     for channel_name, channel_details in self.scan_results.items():
       for service_details in channel_details.values():
@@ -59,7 +70,7 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
           playlist+= str(stream_url) + '\n'
     return playlist
 
-  def status(self):
+  def status(self) -> UiStatus:
     if self._scanner_task:
       self.ui_status['is_scan_active'] = True
       number_of_channels  = len(self._all_channel_names)
@@ -82,12 +93,12 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
       self.ui_status['is_scan_active'] = False
     return self.ui_status
 
-  def stop_scan(self):
+  def stop_scan(self) -> dict:
     if self._scanner_task:
       self._scanner_task.cancel()
     return { }
 
-  async def _run_scan(self):
+  async def _run_scan(self) -> None:
     service_count = 0
     try:
       self.scan_results = {}
@@ -120,18 +131,18 @@ class DabScanner(ChannelEventHandler, ChannelEventPass):
 
     self.ui_status['scanner_status'] = 'Scan finished. Found ' + str(service_count) + ' radio services.'
 
-  async def on_service_detected(self, service_id):
+  async def on_service_detected(self, service_id: int) -> None:
     current_channel = list(self.scan_results.keys())[-1]
     if not service_id in self.scan_results[current_channel].keys():
       if self._dab_device.is_audio_service(service_id):
         self.scan_results[current_channel][service_id] = {}
 
-  async def on_signal_presence(self, is_signal):
+  async def on_signal_presence(self, is_signal: bool) -> None:
     self._is_signal = is_signal
     self._signal_presence_event.set()
     self._signal_presence_event.clear()
 
-  async def stop(self):
+  async def stop(self) -> None:
     if self._scanner_task:
       self._scanner_task.cancel()
       try:

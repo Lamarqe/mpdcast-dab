@@ -15,13 +15,12 @@
 """Controller that receives streaming requests and interacts with the welle.io interface """
 
 import asyncio
-import datetime
 import logging
 import dataclasses
 
 from .service_controller import ServiceController
 from .dab_callbacks import ChannelEventPass
-from .welle_io import ChannelEventHandler
+from .welle_io import DabDevice, ChannelEventHandler
 
 logger = logging.getLogger(__name__)
 
@@ -29,39 +28,34 @@ class RadioController(ChannelEventHandler, ChannelEventPass):
 
   @dataclasses.dataclass
   class Service:
-    name:       str               = None
-    controller: ServiceController = None
+    name:       str               | None = None
+    controller: ServiceController | None = None
 
   @dataclasses.dataclass
   class ChannelData:
     name:               str = ''
-    ensemble_label:     str = None
-    datetime:           int = None
+    ensemble_label:     str | None = None
 
   SERVICE_DISCOVERY_TIMEOUT = 10
   CHANNEL_RESET_DELAY       = 5
 
-  def __init__(self, device):
+  def __init__(self, device: DabDevice) -> None:
     ChannelEventHandler.__init__(self)
-    self._dab_device         = device
-    self._services           = {}
-    self._channel            = self.ChannelData()
-    self._channel_reset_task = None
+    self._dab_device:         DabDevice                          = device
+    self._services:           dict[int, RadioController.Service] = {}
+    self._channel:            RadioController.ChannelData        = self.ChannelData()
+    self._channel_reset_task: asyncio.Task | None                = None
+    # lock to prevent parallel initialization from concurrent requests
+    self._subscription_lock:  asyncio.Lock                       = asyncio.Lock()
 
-    # lock to prevent parallel initialization from multiple users
-    self._subscription_lock = asyncio.Lock()
-
-  async def on_service_detected(self, service_id):
+  async def on_service_detected(self, service_id: int) -> None:
     if not service_id in self._services:
       self._services[service_id] = self.Service()
 
-  async def on_set_ensemble_label(self, label):
+  async def on_set_ensemble_label(self, label: str) -> None:
     self._channel.ensemble_label = label
 
-  async def on_datetime_update(self, timestamp):
-    self._channel.datetime = datetime.datetime.fromtimestamp(timestamp)
-
-  def _fill_service_id(self, lookup_name):
+  def _fill_service_id(self, lookup_name: str) -> int | None:
     for service_id, service in self._services.items():
       if not service.name or len(service.name) == 0:
         service.name = self._dab_device.get_service_name(service_id).rstrip()
@@ -70,7 +64,7 @@ class RadioController(ChannelEventHandler, ChannelEventPass):
     # Not found
     return None
 
-  async def _wait_for_channel(self, service_name):
+  async def _wait_for_channel(self, service_name: str) -> int | None:
     # initial check, as we might already have an active subscription for the service
     service_id = self._fill_service_id(service_name)
     if service_id:
@@ -87,13 +81,13 @@ class RadioController(ChannelEventHandler, ChannelEventPass):
     return None
 
   # returns controller in case the subscription suceeded, otherwise None
-  async def subscribe_service(self, channel, service_name):
+  async def subscribe_service(self, channel: str, service_name: str) -> ServiceController | None:
     async with self._subscription_lock:
       if not self._tune_channel(channel):
         return None
       return await self._subscribe_for_service_in_current_channel(service_name)
 
-  def _tune_channel(self, channel):
+  def _tune_channel(self, channel: str) -> bool:
     # first check, if there is a delayed channel reset pending
     if self._channel_reset_task:
       # we have an active channel, check if we can reuse it
@@ -123,7 +117,7 @@ class RadioController(ChannelEventHandler, ChannelEventPass):
     self._channel.name = channel
     return True
 
-  async def _subscribe_for_service_in_current_channel(self, service_name):
+  async def _subscribe_for_service_in_current_channel(self, service_name: str) -> ServiceController | None:
     # Wait for the selected service to appear in the channel
     try:
       service_id = await self._wait_for_channel(service_name)
@@ -159,21 +153,21 @@ class RadioController(ChannelEventHandler, ChannelEventPass):
     logger.debug('subscribers: %d', service_controller.subscribers)
     return service_controller
 
-  def unsubscribe_service(self, lookup_name):
+  def unsubscribe_service(self, service_name: str) -> None:
     for service_id, service in self._services.items():
-      if service.name == lookup_name:
+      if service.name == service_name:
         self._unsubscribe(service_id)
         return
 
-  def get_service_controller(self, lookup_name):
-    for service_id, service in self._services.items():
-      if service.name == lookup_name:
-        service = self._services.get(service_id)
-        return service.controller if service else None
+  def get_service_controller(self, service_name: str) -> ServiceController | None:
+    for service in self._services.values():
+      if service.name == service_name:
+        # return controller. Might still be None
+        return service.controller
     # not subscribed
     return None
 
-  def _unsubscribe(self, service_id):
+  def _unsubscribe(self, service_id: int) -> None:
     service_controller = self._services[service_id].controller
     if not service_controller:
       return
@@ -182,11 +176,11 @@ class RadioController(ChannelEventHandler, ChannelEventPass):
     logger.debug('subscribers: %d', service_controller.subscribers)
     if service_controller.subscribers == 0:
       self._dab_device.unsubscribe_service(service_id)
-      self._services[service_id].controller.release_waiters()
+      service_controller.release_waiters()
       self._services[service_id].controller = None
       self._cleanup_channel()
 
-  def _cleanup_channel(self):
+  def _cleanup_channel(self) -> None:
     # only reset when there is no service subscription
     for service in self._services.values():
       if service.controller:
@@ -194,20 +188,20 @@ class RadioController(ChannelEventHandler, ChannelEventPass):
     # no subscription found
     self._channel_reset_task = asyncio.get_running_loop().create_task(self._reset_channel_later())
 
-  async def _reset_channel_later(self):
+  async def _reset_channel_later(self) -> None:
     await asyncio.sleep(RadioController.CHANNEL_RESET_DELAY)
     # the reset job did not get cancelled. So do it now
     self._reset_channel()
     self._channel_reset_task = None
 
-  def _reset_channel(self):
+  def _reset_channel(self) -> None:
     assert not next((srv for srv in self._services.values() if srv.controller is not None), None)
     self._dab_device.reset_channel()
-    self._channel.name = None
+    self._channel.name = ''
     self._services.clear()
     self._dab_device.lock.release()
 
-  def stop(self):
+  def stop(self) -> None:
     active_sids = list(self._services.keys())
     for service_id in active_sids:
       self._unsubscribe(service_id)
@@ -217,7 +211,7 @@ class RadioController(ChannelEventHandler, ChannelEventPass):
       self._channel_reset_task.cancel()
       self._channel_reset_task = None
 
-  def can_subscribe(self, new_channel):
-    return (not self._channel.name or            # either there is no active channel
-            self._channel.name == new_channel or # OR target and current channel are the same
-            self._channel_reset_task)            # OR a delayed reset is pending
+  def can_subscribe(self, new_channel: str) -> bool:
+    return ((not self._channel.name) or            # either there is no active channel
+            (self._channel.name == new_channel) or # OR target and current channel are the same
+            bool(self._channel_reset_task))            # OR a delayed reset is pending

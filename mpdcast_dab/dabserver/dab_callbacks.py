@@ -43,7 +43,7 @@ class ChannelEventPass():
   async def on_sync_change(self, is_sync: bool) -> None:
     pass
 
-  async def on_signal_presence(self, is_signal: int) -> None:
+  async def on_signal_presence(self, is_signal: bool) -> None:
     pass
 
   async def on_service_detected(self, service_id: int) -> None:

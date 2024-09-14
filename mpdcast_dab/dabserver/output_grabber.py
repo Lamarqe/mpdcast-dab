@@ -14,26 +14,28 @@
 
 """This module is used to redirect stdout/stderr streams to a python logger."""
 
+import io
 import os
 import sys
 import threading
 import logging
+import typing
 
 class OutputGrabber:
   _ESC_CHAR = b'\b'
 
-  def __init__(self, stream, log_name, log_method):
+  def __init__(self, stream: typing.TextIO, log_name: str, log_method: typing.Callable) -> None:
     self._logger = logging.getLogger(log_name)
     self._pipe_out, self._pipe_in = os.pipe()
-    self._logger_thread = None
+    self._logger_thread: threading.Thread | None = None
     self._log_method = log_method
 
     # store the original stream
-    self._orig_stream   = stream
+    self._orig_stream = stream
     # replicate the original stream using a new FD
     self._replica_stream = os.fdopen(os.dup(self._orig_stream.fileno()), 'w')
 
-  def _log_pipe(self):
+  def _log_pipe(self) -> None:
     captured_stream = ''
     while True:
       char = os.read(self._pipe_out, 1)
@@ -46,7 +48,7 @@ class OutputGrabber:
       else:
         captured_stream += data
 
-  def redirect_stream(self):
+  def redirect_stream(self) -> io.TextIOWrapper:
     if self._logger_thread:
       raise ValueError('stream is already redirected')
 
@@ -57,7 +59,7 @@ class OutputGrabber:
     # return the replicated stream for use in python code
     return self._replica_stream
 
-  def restore_stream(self):
+  def restore_stream(self) -> typing.TextIO:
     if not self._logger_thread:
       raise ValueError('stream not redirected')
 
@@ -71,12 +73,12 @@ class OutputGrabber:
     # return the original stream for use in python code
     return self._orig_stream
 
-  def cleanup(self):
+  def cleanup(self) -> None:
     if self._logger_thread:
       self.restore_stream()
 
 class RedirectedStreams():
-  def __init__(self, log_name) -> None:
+  def __init__(self, log_name: str) -> None:
     self._stdout_grabber = OutputGrabber(sys.stdout, log_name, logging.Logger.error)
     self._stderr_grabber = OutputGrabber(sys.stderr, log_name, logging.Logger.warning)
 
