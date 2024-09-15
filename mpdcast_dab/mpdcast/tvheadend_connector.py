@@ -19,8 +19,24 @@ import time
 import logging
 import aiohttp
 import yarl
+import typing
+from typing import NotRequired
+
+from .mpd_caster import CastData
 
 logger = logging.getLogger(__name__)
+
+ShowDetails = typing.TypedDict('ShowDetails', {'eventId': int, 'channelName': NotRequired[str], 'channelUuid': str,
+              'channelNumber': NotRequired[str], 'channelIcon': NotRequired[str], 'start': int,
+              'stop': int, 'title': NotRequired[str], 'subtitle': NotRequired[str], 'description': NotRequired[str],
+              'widescreen': int, 'subtitled': int, 'audiodesc': int,
+              'hd': int, 'ageRating': int, 'genre': list[int], 'nextEventId': NotRequired[int]})
+
+ChannelData = typing.TypedDict('ChannelData', {'uuid': str, 'enabled': bool, 'autoname': bool, 'name': str,
+              'number': NotRequired[int], 'icon': str, 'icon_public_url': NotRequired[str], 'epgauto': bool,
+              'epglimit': int, 'dvr_pre_time': int, 'dvr_pst_time': int,
+              'epg_tuning': int, 'remote_timeshift': bool, 'services': list[str],
+              'tags': list[str], 'bouquet': str})
 
 supported_stream_links = {'channelnumber': 'number', 'channelname': 'name', 'channel': 'uuid'}
 
@@ -30,13 +46,13 @@ class TvheadendChannel():
   Handle playlist items like: http://<tvh_server>:9981/stream/channelname/BAYERN%203
   """
 
-  def __init__(self, song_urlstring):
-    self.song_url = yarl.URL(song_urlstring)
-    self._initialized = False
-    self._channel_data = None
-    self._show_end = None
+  def __init__(self, song_urlstring: str) -> None:
+    self.song_url:      yarl.URL           = yarl.URL(song_urlstring)
+    self._initialized:  bool               = False
+    self._channel_data: ChannelData | None = None
+    self._show_end:     int | None         = None
 
-  async def initialize(self):
+  async def initialize(self) -> bool:
     logger.info('initializing tvheadend server')
     self._initialized = True
     channel_path_items = self.song_url.path_qs.split('/')
@@ -77,7 +93,7 @@ class TvheadendChannel():
     # channel was not found
     return False
 
-  async def fill_cast_data(self, cast_data):
+  async def fill_cast_data(self, cast_data: CastData) -> bool:
     if not self._initialized:
       return False
     tvheadend_image_url = await self.image_url()
@@ -98,15 +114,16 @@ class TvheadendChannel():
       cast_data.title = self.name()
     return True
 
-  def get_remaining_show_time(self):
+  def get_remaining_show_time(self) -> int | None:
     if not self._show_end:
       return None
     return int(self._show_end - time.time())
 
-  def name(self):
+  def name(self) -> str:
+    assert self._channel_data
     return self._channel_data['name']
 
-  async def current_show(self):
+  async def current_show(self) -> ShowDetails | None:
     if not self._initialized:
       await self.initialize()
 
@@ -125,12 +142,12 @@ class TvheadendChannel():
           epg_json = await epg_response.json()
 
       if 'entries' in epg_json and len(epg_json['entries']) > 0:
-        return epg_json['entries'][0]
+        show: ShowDetails = epg_json['entries'][0]
+        return show
 
-    else:
-      return None
+    return None
 
-  async def image_url(self):
+  async def image_url(self) -> str | None:
     if not self._initialized:
       await self.initialize()
     if not self._channel_data:

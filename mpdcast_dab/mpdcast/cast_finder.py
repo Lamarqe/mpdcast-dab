@@ -19,24 +19,24 @@ import zeroconf
 import pychromecast
 
 class CastFinder(pychromecast.discovery.AbstractCastListener):
-  def __init__(self, device_name):
-    self._device_name = device_name
-    self._device = None
-    self._browser = None
-    self._discovery_done_event = asyncio.Event()
+  def __init__(self, device_name: str) -> None:
+    self._device_name:          str                                = device_name
+    self._device:               pychromecast.uuid.UUID             = None
+    self._browser:              pychromecast.discovery.CastBrowser = None
+    self._discovery_done_event: asyncio.Event                      = asyncio.Event()
 
-  def add_cast(self, uuid, _service):
+  def add_cast(self, uuid: pychromecast.uuid.UUID, _service: str) -> None:
     if self._device_name == self._browser.services[uuid].friendly_name:
       self._device = self._browser.services[uuid]
       self._discovery_done_event.set()
 
-  def remove_cast(self, uuid, _service, cast_info):
+  def remove_cast(self, uuid: pychromecast.uuid.UUID, _service: str, cast_info: pychromecast.CastInfo) -> None:
     pass
 
-  def update_cast(self, uuid, _service):
+  def update_cast(self, uuid: pychromecast.uuid.UUID, _service: str) -> None:
     pass
 
-  async def find_device (self):
+  async def find_device (self) -> pychromecast.uuid.UUID:
     self._device = None
     self._discovery_done_event.clear()
     self._browser = pychromecast.discovery.CastBrowser(self, zeroconf.Zeroconf(), None)
@@ -45,5 +45,5 @@ class CastFinder(pychromecast.discovery.AbstractCastListener):
     self._browser.stop_discovery()
     return self._device
 
-  def cancel(self):
+  def cancel(self) -> None:
     self._discovery_done_event.set()

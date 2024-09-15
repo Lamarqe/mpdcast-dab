@@ -19,6 +19,9 @@ import time
 import logging
 import aiohttp
 import yarl
+
+from .mpd_caster import CastData
+
 logger = logging.getLogger(__name__)
 
 class DabserverStation():
@@ -27,15 +30,15 @@ class DabserverStation():
   Handle playlist items like: http://<dab_server>:8080/stream/11D/BAYERN%203
   """
 
-  def __init__(self, song_urlstring):
+  def __init__(self, song_urlstring: str) -> None:
     self.song_url = yarl.URL(song_urlstring)
     self._initialized = False
     self.image_url = 'https://www.worlddab.org/image/content/2054/400x235_DABplus_Logo_Farbe_sRGB.png'
     self.label = ''
-    self.channel_name = None
-    self.station_name = None
+    self.channel_name: str
+    self.station_name: str
 
-  async def initialize(self):
+  async def initialize(self) -> bool:
     logger.info('initializing dab server')
     self._initialized = True
     channel_path_items = self.song_url.parts
@@ -62,7 +65,7 @@ class DabserverStation():
       logger.info('return false, not 4 items')
       return False
 
-  def fill_cast_data(self, cast_data):
+  def fill_cast_data(self, cast_data: CastData) -> bool:
     if not self._initialized:
       return False
     cast_data.title     = self.station_name
@@ -71,7 +74,7 @@ class DabserverStation():
     return True
 
 
-  async def new_label(self):
+  async def new_label(self) -> None:
     label_path = 'label/next/' + self.channel_name + '/' + self.station_name
     label_url = self.song_url.with_path(label_path)
 
@@ -84,7 +87,7 @@ class DabserverStation():
             self.label = await label_response.text()
             return
 
-  async def new_image(self):
+  async def new_image(self) -> None:
     image_path = 'image/next/' + self.channel_name + '/' + self.station_name
     image_url = self.song_url.with_path(image_path)
 

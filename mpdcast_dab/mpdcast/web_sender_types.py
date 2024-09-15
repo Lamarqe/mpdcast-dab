@@ -29,7 +29,7 @@ class Image(dict):
   HEIGHT = "height"
   WIDTH  = "width"
 
-  def __init__(self, url):
+  def __init__(self, url: str) -> None:
     super().__init__()
     self[Image.URL]    = url
     self[Image.HEIGHT] = None
@@ -52,7 +52,7 @@ class MusicTrackMediaMetadata(dict):
   TITLE        = "title"
   TRACKNUMBER  = "trackNumber"
 
-  def __init__(self):
+  def __init__(self) -> None:
     super().__init__()
     self[MusicTrackMediaMetadata.METADATATYPE] = media.METADATA_TYPE_MUSICTRACK
     self[MusicTrackMediaMetadata.TYPE]         = media.METADATA_TYPE_MUSICTRACK
@@ -68,7 +68,7 @@ class MediaInfo(dict):
   TEXTTRACKSTYLE = "textTrackStyle"
   TRACKS         = "tracks"
 
-  def __init__(self, contentId, contentType):
+  def __init__(self, contentId: str | None, contentType: str | None) -> None:
     super().__init__()
     self[MediaInfo.CONTENTID]      = contentId
     self[MediaInfo.CONTENTTYPE]    = contentType
@@ -89,7 +89,7 @@ class QueueItem(dict):
   ACTIVETRACKIDS   = "activeTrackIds"
   CUSTOMDATA       = "customData"
 
-  def __init__(self, mediaInfo):
+  def __init__(self, mediaInfo: MediaInfo) -> None:
     super().__init__()
     self[QueueItem.MEDIA]            = mediaInfo
     self[QueueItem.ITEMID]           = None
@@ -105,7 +105,7 @@ class QueueUpdateItemsRequest(dict):
   CUSTOMDATA = "customData"
   ITEMS      = "items"
 
-  def __init__(self, itemsToUpdate):
+  def __init__(self, itemsToUpdate: list[QueueItem]) -> None:
     super().__init__()
     self[const.MESSAGE_TYPE]                 = media.TYPE_QUEUE_UPDATE
     self[QueueUpdateItemsRequest.ITEMS]      = itemsToUpdate
