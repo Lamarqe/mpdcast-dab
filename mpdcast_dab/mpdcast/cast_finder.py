@@ -22,7 +22,7 @@ import pychromecast
 class CastFinder(pychromecast.discovery.AbstractCastListener):
   def __init__(self, device_name: str) -> None:
     self._device_name:          str                                = device_name
-    self._device:               uuid.UUID             = None
+    self._device:               uuid.UUID | None                   = None
     self._browser:              pychromecast.discovery.CastBrowser = None
     self._discovery_done_event: asyncio.Event                      = asyncio.Event()
 
@@ -37,7 +37,7 @@ class CastFinder(pychromecast.discovery.AbstractCastListener):
   def update_cast(self, uuid: uuid.UUID, _service: str) -> None:
     pass
 
-  async def find_device (self) -> uuid.UUID:
+  async def find_device (self) -> uuid.UUID | None:
     self._device = None
     self._discovery_done_event.clear()
     self._browser = pychromecast.discovery.CastBrowser(self, zeroconf.Zeroconf(), None)
