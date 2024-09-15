@@ -94,8 +94,8 @@ class MpdConfig():
       raise SyntaxError('No httpd audio output defined.')
     if httpd_port is None:
       raise SyntaxError('No httpd streaming port defined.')
-    if isinstance(httpd_port, int):
-      self.streaming_port = httpd_port
+    if httpd_port.isdigit():
+      self.streaming_port = int(httpd_port)
     else:
       raise SyntaxError('Invalid http streaming port defined: ' + httpd_port + '.')
     if not self.device_name:
@@ -327,7 +327,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       if picture_dict:
         cast_data.image_url = self._mpd.image_cache.store_song_picture(song_file, picture_dict)
 
-  def new_cast_status(self, status: pychromecast.CastStatus) -> None:
+  def new_cast_status(self, status: pychromecast.controllers.receiver.CastStatus) -> None:
     if self._cast.chromecast:
       logger.info ("Chromecast Session ID: %s",  str(self._cast.chromecast.status.session_id))
     if self._cast.controller:

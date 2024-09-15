@@ -14,15 +14,17 @@
 
 """This module retrieves stream metadata from TvHeadend."""
 
+from __future__ import annotations
 import json
 import time
 import logging
 import aiohttp
 import yarl
 import typing
-from typing import NotRequired
+from typing import NotRequired, TYPE_CHECKING
 
-from .mpd_caster import CastData
+if TYPE_CHECKING:
+  from .mpd_caster import CastData
 
 logger = logging.getLogger(__name__)
 

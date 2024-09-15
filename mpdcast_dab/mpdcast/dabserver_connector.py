@@ -14,13 +14,16 @@
 
 """This module retrieves stream metadata from MpdCasts DAB server."""
 
+from __future__ import annotations
 import asyncio
 import time
 import logging
+import typing
 import aiohttp
 import yarl
 
-from .mpd_caster import CastData
+if typing.TYPE_CHECKING:
+  from .mpd_caster import CastData
 
 logger = logging.getLogger(__name__)
 
