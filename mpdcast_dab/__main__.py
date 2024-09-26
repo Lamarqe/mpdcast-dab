@@ -17,6 +17,7 @@
 
 """Main class which starts cast sender and DAB server"""
 
+from __future__ import annotations
 import sys
 import signal
 import asyncio
