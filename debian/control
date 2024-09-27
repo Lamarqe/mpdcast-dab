@@ -7,6 +7,6 @@ Homepage: https://github.com/Lamarqe/mpdcast-dab
 
 Package: mpdcast-dab
 Architecture: any
-Depends: librtlsdr2, mpd, python3-mpd, python3-aiohttp, python3-pychromecast
+Depends: librtlsdr2, libfftw3-single3, python3, mpd, python3-mpd, python3-aiohttp, python3-pychromecast
 Description: MPD to Google cast streaming application
  MPD to Google cast streaming application with support for DAB+ radio 
