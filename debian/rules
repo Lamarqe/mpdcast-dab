@@ -4,7 +4,9 @@
 export PYBUILD_NAME = mpdcast-dab
 
 # secondly called by launchpad
-build:
+build:  build-arch
+
+build-arch:
 	mkdir build
 	cd build; cmake ..
 	make -C build
