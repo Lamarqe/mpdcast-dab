@@ -6,5 +6,6 @@ export PYBUILD_NAME = mpdcast-dab
 	dh $@ --builddirectory=build --with python3 --buildsystem=pybuild
 
 override_dh_auto_configure:
+	mkdir build
 	cd build && cmake ..
 	make -C build
