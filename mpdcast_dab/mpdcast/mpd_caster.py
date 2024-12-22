@@ -69,7 +69,7 @@ class MpdConfig():
     with open(self._filename, 'r', encoding='utf-8') as cfg_file:
       config_string = cfg_file.read()
       # convert curly brace groups to toml arrays
-      config_string = re.sub(r"\n([^\s#]*?)\s*{(.*?)}", r"\n[[\1]]\2\n", config_string, flags=re.S, count=0)
+      config_string = re.sub(r"(?:^|\n)([^\s#]*?)\s*{(.*?)}", r"\n[[\1]]\2\n", config_string, flags=re.S, count=0)
       # separate key and value with equals sign
       config_string = re.sub(r"^\s*(\w+)\s*(.*)$", r"\1 = \2", config_string, flags=re.M, count=0)
       # now the config should adhere to toml spec.
