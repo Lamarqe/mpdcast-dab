@@ -39,7 +39,7 @@ class ImageRequestHandler():
   # Chromecast will use this http interface to get the actual images
   async def _http_handler(self, request: web.Request) -> web.Response:
     song_path = request.match_info['song_path']
-    if not song_path in self.images:
+    if song_path not in self.images:
       raise web.HTTPMovedPermanently('https://www.musicpd.org/logo.png')
 
     return web.Response(

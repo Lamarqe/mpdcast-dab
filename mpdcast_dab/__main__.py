@@ -57,6 +57,7 @@ def update_logger_config(verbose: bool) -> None:
   logging.getLogger('aiohttp').setLevel(external_log_level)
   logging.getLogger('pychromecast').setLevel(external_log_level)
   logging.getLogger('zeroconf').setLevel(external_log_level)
+  logging.getLogger('mpd').setLevel(external_log_level)
   logging.getLogger('Welle.io').setLevel(external_log_level)
   logging.getLogger(__name__).setLevel(logging.INFO)
 

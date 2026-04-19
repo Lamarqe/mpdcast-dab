@@ -18,8 +18,7 @@ import asyncio
 import re
 import logging
 import dataclasses
-from typing import TypedDict, NotRequired, List, Any
-import typing
+from typing import List, Any
 import tomllib
 import zeroconf
 from aiohttp import web

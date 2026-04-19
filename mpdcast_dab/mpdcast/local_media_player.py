@@ -14,9 +14,9 @@
 
 """Module to load a local cast receiver app via a public redirect service in order to avoid CORS violations."""
 
+import inspect
 import logging
 import requests
-import typing
 
 import yarl
 from pychromecast.controllers.media import MediaController
@@ -61,8 +61,8 @@ class LocalMediaPlayerController(MediaController):
     queueitem = QueueItem(mediainfo)
     queueitem[QueueItem.ITEMID] = 1
     queue_update_items_request = QueueUpdateItemsRequest([queueitem])
-
-    self._send_command(queue_update_items_request)
-
-  def quick_play(self, media_id : str | None = None, media_type : str = "video/mp4", **kwargs: typing.Any) -> None:
-    self.play_media(media_id, media_type, **kwargs)
+    
+    if len(inspect.getfullargspec(self._send_command).args) == 2:
+      self._send_command(queue_update_items_request)
+    else:
+      self._send_command(queue_update_items_request, None)
