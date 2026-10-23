@@ -135,6 +135,5 @@ make -C build -j3
 5. Run MpdCast DAB and enjoy it
 
 ```
-export PYTHONPATH=$PWD
-./mpdcast_dab/__main__.py
+python3 -m mpdcast_dab
 ```
