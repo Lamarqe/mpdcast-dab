@@ -24,9 +24,10 @@
 #include <stdio.h>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
-#if !(defined(DABLIN_AAC_FAAD2) ^ defined(DABLIN_AAC_FDKAAC))
-#error "You must select a AAC decoder by defining either DABLIN_AAC_FAAD2 or DABLIN_AAC_FDKAAC!"
+#if (defined(DABLIN_AAC_FAAD2) + defined(DABLIN_AAC_FDKAAC) + defined(DABLIN_AAC_FFMPEG)) != 1
+#error "You must select a AAC decoder by defining either DABLIN_AAC_FAAD2, DABLIN_AAC_FDKAAC or DABLIN_AAC_FFMPEG!"
 #endif
 
 #ifdef DABLIN_AAC_FAAD2
@@ -35,6 +36,17 @@
 
 #ifdef DABLIN_AAC_FDKAAC
 #include <fdk-aac/aacdecoder_lib.h>
+#endif
+
+#ifdef DABLIN_AAC_FFMPEG
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavutil/channel_layout.h>
+#include <libavutil/version.h>
+}
+#if LIBAVCODEC_VERSION_MAJOR < 63
+#error "FFmpeg 9 (libavcodec 63) or newer is required!"
+#endif
 #endif
 
 extern "C" {
@@ -125,6 +137,28 @@ private:
 public:
 	AACDecoderFDKAAC(SubchannelSinkObserver* observer, SuperframeFormat sf_format);
 	~AACDecoderFDKAAC();
+
+	void DecodeFrame(uint8_t *data, size_t len);
+};
+#endif
+
+
+#ifdef DABLIN_AAC_FFMPEG
+// --- AACDecoderFFmpeg -----------------------------------------------------------------
+class AACDecoderFFmpeg : public AACDecoder {
+private:
+	bool float32;
+	AVCodecContext *ctx;
+	AVPacket *packet;
+	AVFrame *frame;
+	int output_sr;
+	int output_ch;
+	std::vector<uint8_t> output_frame;
+
+	void OutputFrame();
+public:
+	AACDecoderFFmpeg(SubchannelSinkObserver* observer, SuperframeFormat sf_format, bool float32);
+	~AACDecoderFFmpeg();
 
 	void DecodeFrame(uint8_t *data, size_t len);
 };

@@ -18,6 +18,8 @@
 
 #include "dabplus_decoder.h"
 
+#include <cmath>
+
 
 // --- SuperframeFilter -----------------------------------------------------------------
 SuperframeFilter::SuperframeFilter(SubchannelSinkObserver* observer, bool decode_audio, bool enable_float32) : SubchannelSink(observer, "aac") {
@@ -249,6 +251,9 @@ void SuperframeFilter::ProcessFormat() {
 #endif
 #ifdef DABLIN_AAC_FDKAAC
 		aac_dec = new AACDecoderFDKAAC(observer, sf_format);
+#endif
+#ifdef DABLIN_AAC_FFMPEG
+		aac_dec = new AACDecoderFFmpeg(observer, sf_format, enable_float32);
 #endif
 	}
 }
@@ -536,5 +541,120 @@ void AACDecoderFDKAAC::DecodeFrame(uint8_t *data, size_t len) {
 		return;
 
 	observer->PutAudio(output_frame, output_frame_len);
+}
+#endif
+
+
+#ifdef DABLIN_AAC_FFMPEG
+// --- AACDecoderFFmpeg -----------------------------------------------------------------
+AACDecoderFFmpeg::AACDecoderFFmpeg(SubchannelSinkObserver* observer, SuperframeFormat sf_format, bool float32) : AACDecoder("FFmpeg", observer, sf_format) {
+	this->float32 = float32;
+	output_sr = 0;
+	output_ch = 0;
+
+	// corrupt AUs are reported via ACCFrameError; avoid flooding stderr
+	av_log_set_level(AV_LOG_FATAL);
+
+	const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_AAC);
+	if(!codec)
+		throw std::runtime_error("AACDecoderFFmpeg: no AAC decoder available");
+
+	ctx = avcodec_alloc_context3(codec);
+	packet = av_packet_alloc();
+	frame = av_frame_alloc();
+	if(!ctx || !packet || !frame) {
+		avcodec_free_context(&ctx);
+		av_packet_free(&packet);
+		av_frame_free(&frame);
+		throw std::runtime_error("AACDecoderFFmpeg: error while allocating decoder");
+	}
+
+	// pass the AudioSpecificConfig (960 transform, SBR/PS signaling) as extradata
+	ctx->extradata = (uint8_t*) av_mallocz(asc_len + AV_INPUT_BUFFER_PADDING_SIZE);
+	if(ctx->extradata) {
+		memcpy(ctx->extradata, asc, asc_len);
+		ctx->extradata_size = asc_len;
+	}
+
+	int result = ctx->extradata ? avcodec_open2(ctx, codec, nullptr) : AVERROR(ENOMEM);
+	if(result < 0) {
+		char err[AV_ERROR_MAX_STRING_SIZE];
+		av_strerror(result, err, sizeof(err));
+		avcodec_free_context(&ctx);
+		av_packet_free(&packet);
+		av_frame_free(&frame);
+		throw std::runtime_error("AACDecoderFFmpeg: error while avcodec_open2: " + std::string(err));
+	}
+
+	// StartAudio is called with the first decoded frame, as only then the
+	// output format (e.g. implicitly signaled PS) is known for sure
+}
+
+AACDecoderFFmpeg::~AACDecoderFFmpeg() {
+	avcodec_free_context(&ctx);
+	av_packet_free(&packet);
+	av_frame_free(&frame);
+}
+
+void AACDecoderFFmpeg::DecodeFrame(uint8_t *data, size_t len) {
+	// the packet buffer must be padded, so copy the AU
+	if(av_new_packet(packet, len) < 0)
+		throw std::runtime_error("AACDecoderFFmpeg: error while av_new_packet");
+	memcpy(packet->data, data, len);
+
+	int result = avcodec_send_packet(ctx, packet);
+	av_packet_unref(packet);
+	bool error = result < 0;
+
+	while(!error) {
+		result = avcodec_receive_frame(ctx, frame);
+		if(result == AVERROR(EAGAIN) || result == AVERROR_EOF)
+			break;
+		if(result < 0) {
+			error = true;
+			break;
+		}
+		OutputFrame();
+		av_frame_unref(frame);
+	}
+
+	observer->ACCFrameError(error ? 1 : 0);
+}
+
+void AACDecoderFFmpeg::OutputFrame() {
+	int channels = frame->ch_layout.nb_channels;
+	int samples = frame->nb_samples;
+	if(channels < 1 || channels > 2 || samples <= 0)
+		return;
+
+	if(frame->sample_rate != output_sr || channels != output_ch) {
+		output_sr = frame->sample_rate;
+		output_ch = channels;
+		observer->StartAudio(output_sr, output_ch, float32);
+	}
+
+	// convert to interleaved float32 or signed 16 bit (native endian), as libfaad did
+	bool planar = frame->format == AV_SAMPLE_FMT_FLTP;
+	if(!planar && frame->format != AV_SAMPLE_FMT_FLT)
+		throw std::runtime_error("AACDecoderFFmpeg: unsupported sample format " + std::to_string(frame->format));
+
+	output_frame.resize((size_t) samples * channels * (float32 ? 4 : 2));
+	float *out_float = (float*) output_frame.data();
+	int16_t *out_s16 = (int16_t*) output_frame.data();
+
+	for(int s = 0; s < samples; s++) {
+		for(int c = 0; c < channels; c++) {
+			float value = planar ? ((const float*) frame->extended_data[c])[s] : ((const float*) frame->extended_data[0])[s * channels + c];
+			size_t i = (size_t) s * channels + c;
+			if(float32) {
+				out_float[i] = value;
+			} else {
+				float scaled = value * 32768.0f;
+				out_s16[i] = scaled >= 32767.0f ? 32767 : (scaled <= -32768.0f ? -32768 : (int16_t) lrintf(scaled));
+			}
+		}
+	}
+
+	observer->PutAudio(output_frame.data(), output_frame.size());
 }
 #endif

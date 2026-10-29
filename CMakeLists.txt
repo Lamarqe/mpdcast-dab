@@ -14,7 +14,6 @@ option(RTLSDR            "Compile with RTL-SDR support"          ON )
 
 add_definitions(-Wall)
 add_definitions(-g)
-add_definitions(-DDABLIN_AAC_FAAD2)
 
 if(MINGW)
     add_definitions(-municode)
@@ -33,7 +32,23 @@ if(PROFILING)
 endif()
 
 find_package(FFTW3f REQUIRED)
-find_package(Faad REQUIRED)
+# AAC decoder: prefer FFmpeg >= 9 (libavcodec 63), otherwise fall back to libfaad
+find_package(PkgConfig)
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(FFMPEG QUIET libavcodec>=63 libavutil>=61)
+endif()
+if(FFMPEG_FOUND)
+    message(STATUS "AAC decoder: FFmpeg (libavcodec ${FFMPEG_libavcodec_VERSION})")
+    add_definitions(-DDABLIN_AAC_FFMPEG)
+    set(AAC_INCLUDE_DIRS ${FFMPEG_INCLUDE_DIRS})
+    set(AAC_LIBRARIES ${FFMPEG_LINK_LIBRARIES})
+else()
+    find_package(Faad REQUIRED)
+    message(STATUS "AAC decoder: libfaad (FFmpeg >= 9 not found)")
+    add_definitions(-DDABLIN_AAC_FAAD2)
+    set(AAC_INCLUDE_DIRS ${FAAD_INCLUDE_DIRS})
+    set(AAC_LIBRARIES ${FAAD_LIBRARIES})
+endif()
 find_package(Threads REQUIRED)
 find_package(pybind11 REQUIRED)
 
@@ -50,7 +65,7 @@ include_directories(
     src/gui
     src/libs/fec
     ${FFTW3F_INCLUDE_DIRS}
-    ${FAAD_INCLUDE_DIRS}
+    ${AAC_INCLUDE_DIRS}
     ${LIBRTLSDR_INCLUDE_DIRS}
     ${Python_INCLUDE_DIRS}
 )
@@ -147,7 +162,7 @@ if(BUILD_WELLE_PY)
     target_link_libraries (${objectName} PRIVATE
       ${LIBRTLSDR_LIBRARIES}
       ${FFTW3F_LIBRARIES}
-      ${FAAD_LIBRARIES}
+      ${AAC_LIBRARIES}
       ${Python_LIBRARIES}
       ${CMAKE_DL_LIBS}
       Threads::Threads

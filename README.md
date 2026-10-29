@@ -98,7 +98,7 @@ General Information
 The following libraries and their development files are needed:
 * Python >= 3.11 
 * FFTW3f
-* libfaad
+* FFmpeg >= 9 (libavcodec, libavutil) or libfaad (used if FFmpeg is older than 9)
 * librtlsdr
 * pybind11
 
@@ -115,7 +115,7 @@ sudo apt install git build-essential cmake
 2. Install the following packages
 
 ```
-sudo apt install python3-dev libfftw3-dev libfaad-dev librtlsdr-dev pybind11-dev
+sudo apt install python3-dev libfftw3-dev libavcodec-dev libavutil-dev libfaad-dev librtlsdr-dev pybind11-dev
 ```
 
 3. Clone MpdCast DAB
