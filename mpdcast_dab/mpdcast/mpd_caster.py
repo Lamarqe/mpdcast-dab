@@ -44,6 +44,8 @@ FullConf = typing.TypedDict('FullConf', {'port': NotRequired[int],
 CAST_PATH     = '/cast_receiver'
 CAST_PAGE     = 'receiver.html'
 DEFAULT_IMAGE = 'https://www.musicpd.org/logo.png'
+# pychromecast retries to connect every few seconds, so a disconnect can take that long
+CAST_DISCONNECT_TIMEOUT = 15
 
 class MpdConfig():
   def __init__(self, filename: str) -> None:
@@ -150,13 +152,20 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
 
     self._dabserver_current_station: DabserverStation | None = None
     self._main_task: asyncio.Task                     | None = None
+    self._loop:      asyncio.AbstractEventLoop        | None = None
+    # set (from the pychromecast thread) when the connection to the cast device is lost
+    self._cast_lost_event: asyncio.Event = asyncio.Event()
+    # last known MPD playback state
+    self._mpd_is_playing: bool = False
+    # MPD playback state at the time the cast device got lost, None if not lost
+    self._mpd_playing_when_cast_lost: bool | None = None
 
   def initialize(self) -> bool:
     return self._mpd.config.initialize()
 
   async def start(self) -> None:
-    loop = asyncio.get_running_loop()
-    self._main_task = loop.create_task(self.run())
+    self._loop = asyncio.get_running_loop()
+    self._main_task = self._loop.create_task(self.run())
 
   async def run(self) -> None:
     while True:
@@ -199,6 +208,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
           self._cast.chromecast.quit_app()
           await asyncio.sleep(0.5)
         self._cast.controller = LocalMediaPlayerController(self._cast.receiver_url, False)
+        self._cast_lost_event.clear()
         self._cast.chromecast.register_handler(self._cast.controller)  # allows Chromecast to use Local Media Player app
         self._cast.chromecast.register_connection_listener(self)  # await new_connection_status() => re-initialize
         self._cast.controller.register_status_listener(self)      # await new_media_status() / load_media_failed()
@@ -334,18 +344,58 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
     logger.info ("Listener Session ID: %s", str(status.session_id))
 
   def new_connection_status(self, status: pychromecast.socket_client.ConnectionStatus) -> None:
-    # Handle when the chromecast device gets shut down or loses network connection
-    if status.status == 'LOST':
-      self._cast.controller = None
-      self._cast.chromecast = None
+    # Handle when the chromecast device gets shut down or loses network connection.
+    # Called from the pychromecast thread, so only notify the event loop.
+    if status.status == 'LOST' and self._loop:
+      self._loop.call_soon_threadsafe(self._cast_lost_event.set)
+
+  async def _handle_cast_lost(self) -> None:
+    logger.warning('Connection to cast device lost')
+    self._cast_lost_event.clear()
+    self._mpd_playing_when_cast_lost = self._mpd_is_playing
+    # Disable internal update events
+    self._stop_update_tasks()
+    chromecast = self._cast.chromecast
+    self._cast.controller = None
+    self._cast.chromecast = None
+    if chromecast:
+      # Stop the reconnection attempts of pychromecast. Otherwise the orphaned
+      # connection would reconnect later on and report its status changes to us.
+      try:
+        await asyncio.get_running_loop().run_in_executor(None, chromecast.disconnect, CAST_DISCONNECT_TIMEOUT)
+      except TimeoutError:
+        logger.warning('Timeout while disconnecting from the cast device')
 
   async def cast_until_connection_lost(self) -> None:
     if not self._mpd.client.connected:
       await self._mpd.client.connect('localhost', self._mpd.config.port)
 
     initial_mpd_status = await self._mpd.client.status()
-    # avoid spontaneous playback when chromecast becomes available, eg after nightly reboot
-    ignore_current_playback = bool(initial_mpd_status['state'] == 'play')
+    self._mpd_is_playing = bool(initial_mpd_status['state'] == 'play')
+    # avoid spontaneous playback when chromecast becomes available, eg after nightly reboot:
+    # Ignore a playback which was already active when the chromecast got lost (or at startup).
+    # A playback which was started while the chromecast was unavailable is cast right away.
+    ignore_current_playback = self._mpd_is_playing and self._mpd_playing_when_cast_lost is not False
+    self._mpd_playing_when_cast_lost = None
+
+    # Wait for MPD events and for a connection loss of the cast device in parallel,
+    # so that a lost cast device is rediscovered right away and not only on the next MPD event.
+    mpd_task  = asyncio.create_task(self._process_mpd_events(ignore_current_playback))
+    lost_task = asyncio.create_task(self._cast_lost_event.wait())
+    try:
+      done, _ = await asyncio.wait({mpd_task, lost_task}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+      mpd_task.cancel()
+      lost_task.cancel()
+      await asyncio.gather(mpd_task, lost_task, return_exceptions=True)
+
+    if lost_task in done:
+      await self._handle_cast_lost()
+    if mpd_task in done:
+      # re-raise unexpected exceptions
+      mpd_task.result()
+
+  async def _process_mpd_events(self, ignore_current_playback: bool) -> None:
     cast_is_active      = False
     processed_mpd_song  = ''
 
@@ -353,13 +403,7 @@ class MpdCaster(pychromecast.controllers.receiver.CastStatusListener,
       async for _ in self._mpd.client.idle():
         mpd_client_status = await self._mpd.client.status()
         mpd_is_playing = bool(mpd_client_status['state'] == 'play')
-
-        if not self._cast.chromecast:
-          # Chromecast disappeared from the network.
-          if cast_is_active:
-            # Disable internal update events
-            self._handle_mpd_stop_play()
-          return
+        self._mpd_is_playing = mpd_is_playing
 
         # continue to ignore playback if we ignored until now and MPD is still playing
         ignore_current_playback = bool(ignore_current_playback and mpd_is_playing)
