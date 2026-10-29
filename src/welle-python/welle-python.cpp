@@ -16,6 +16,12 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <algorithm>
+#include <chrono>
+#include <iomanip>
+#include <mutex>
+#include <sstream>
+
 #include "backend/radio-receiver.h"
 #include "input/input_factory.h"
 #include "various/channels.h"
@@ -27,12 +33,106 @@ namespace py = pybind11;
   py::function method = py::get_override(static_cast<const cname *>(this), name);             \
   py::module_::import("asyncio").attr("run_coroutine_threadsafe")(method(__VA_ARGS__), loop);
 
+// Reception statistics are aggregated in C++ and logged periodically.
+// Forwarding every FIB or frame event to python would be too costly
+// on low end devices.
+static constexpr auto STATS_LOG_INTERVAL = std::chrono::seconds(5);
+
+static py::object getStatsLogger()
+{
+  return py::module_::import("logging").attr("getLogger")("DabStats");
+}
+
+static void logStats(const py::object& logger, const std::string& text)
+{
+  py::gil_scoped_acquire gil;
+  logger.attr("info")(text);
+}
+
 class ServiceEventHandler : public ProgrammeHandlerInterface {
+protected:
+  py::object statsLogger;
+  std::mutex statsMutex;
+  std::string serviceInfo = "Service";
+  std::chrono::steady_clock::time_point statsStart = std::chrono::steady_clock::now();
+  int logicalFrames = 0;
+  int auErrors = 0;
+  int rsChecks = 0;
+  int rsUncorrectable = 0;
+  int rsCorrectedBytes = 0;
+  int aacFrames = 0;
+  int aacErrors = 0;
+
+  // must be called with statsMutex held. Returns an empty string if not due yet.
+  std::string takeStatsIfDue()
+  {
+    const auto now = std::chrono::steady_clock::now();
+    if (now - statsStart < STATS_LOG_INTERVAL)
+      return {};
+
+    std::ostringstream text;
+    text << serviceInfo << ": logical frames " << logicalFrames
+         << ", AU CRC errors " << auErrors;
+    // For DAB+, there is one RS check per superframe once in sync,
+    // but one per logical frame while searching for the superframe sync
+    if (rsChecks)
+      text << ", RS checks " << rsChecks
+           << " (uncorrectable " << rsUncorrectable
+           << ", corrected bytes " << rsCorrectedBytes << ")";
+    if (aacFrames)
+      text << ", AAC decode errors " << aacErrors << "/" << aacFrames;
+
+    statsStart = now;
+    logicalFrames = auErrors = 0;
+    rsChecks = rsUncorrectable = rsCorrectedBytes = 0;
+    aacFrames = aacErrors = 0;
+    return text.str();
+  }
+
 public:
-  virtual void onFrameErrors(int frameErrors) override {}
+  ServiceEventHandler(): statsLogger(getStatsLogger()) {}
+
+  void setServiceInfo(const std::string& info)
+  {
+    {
+      std::lock_guard<std::mutex> lock(statsMutex);
+      serviceInfo = info;
+    }
+    logStats(statsLogger, "Subscribed: " + info);
+  }
+
+  // called once per logical frame (24 ms) with the number of AU CRC errors
+  virtual void onFrameErrors(int frameErrors) override
+  {
+    std::string text;
+    {
+      std::lock_guard<std::mutex> lock(statsMutex);
+      logicalFrames++;
+      auErrors += frameErrors;
+      text = takeStatsIfDue();
+    }
+    if (!text.empty())
+      logStats(statsLogger, text);
+  }
+
   virtual void onNewAudio(std::vector<int16_t>&& audioData, int sampleRate, const std::string& mode) override {}
-  virtual void onRsErrors(bool uncorrectedErrors, int numCorrectedErrors) override  {}
-  virtual void onAacErrors(int aacErrors) override {}
+
+  virtual void onRsErrors(bool uncorrectedErrors, int numCorrectedErrors) override
+  {
+    std::lock_guard<std::mutex> lock(statsMutex);
+    rsChecks++;
+    if (uncorrectedErrors)
+      rsUncorrectable++;
+    rsCorrectedBytes += numCorrectedErrors;
+  }
+
+  virtual void onAacErrors(int aacErrors) override
+  {
+    std::lock_guard<std::mutex> lock(statsMutex);
+    aacFrames++;
+    if (aacErrors)
+      this->aacErrors++;
+  }
   virtual void onNewDynamicLabel(const std::string& label) override {}
   virtual void onMOT(const mot_file_t& mot_file) override {}
   virtual void onPADLengthError(size_t announced_xpad_len, size_t xpad_len) override {}
@@ -116,7 +216,118 @@ public:
   }
 };
 
-class ChannelEventHandler : public NullRadioController {};
+class ChannelEventHandler : public NullRadioController {
+protected:
+  py::object statsLogger;
+  std::mutex statsMutex;
+  InputInterface* input = nullptr;
+  std::string channelName;
+  bool agc = false;
+  std::chrono::steady_clock::time_point statsStart = std::chrono::steady_clock::now();
+  bool synced = false;
+  int syncedFrames = 0;
+  int syncLosses = 0;
+  int fibOk = 0;
+  int fibTotal = 0;
+  int snrCount = 0;
+  float snrSum = 0;
+  float snrMin = 0;
+  bool gainValid = false;
+  float gainMin = 0;
+  float gainMax = 0;
+  int fineCorrector = 0;
+  int coarseCorrector = 0;
+
+  // must be called with statsMutex held. Returns an empty string if not due yet.
+  std::string takeStatsIfDue()
+  {
+    const auto now = std::chrono::steady_clock::now();
+    if (now - statsStart < STATS_LOG_INTERVAL)
+      return {};
+
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(1);
+    text << "Channel " << channelName << ": frames " << syncedFrames
+         << ", sync losses " << syncLosses;
+    if (snrCount)
+      text << ", SNR avg " << snrSum / snrCount << " dB (min " << snrMin << ")";
+    text << ", FIB CRC ok " << fibOk << "/" << fibTotal;
+    if (fibTotal)
+      text << " (" << 100.0f * fibOk / fibTotal << "%)";
+    text << ", freq correction fine " << fineCorrector << " Hz coarse " << coarseCorrector << " Hz";
+    if (gainValid)
+      text << ", gain " << gainMin << ".." << gainMax << " dB" << (agc ? " (AGC)" : "");
+
+    statsStart = now;
+    syncedFrames = syncLosses = 0;
+    fibOk = fibTotal = 0;
+    snrCount = 0;
+    snrSum = 0;
+    gainValid = false;
+    return text.str();
+  }
+
+public:
+  ChannelEventHandler(): statsLogger(getStatsLogger()) {}
+
+  void setStatsSource(InputInterface* inputDevice, const std::string& channel, bool isAgc)
+  {
+    std::lock_guard<std::mutex> lock(statsMutex);
+    input = inputDevice;
+    channelName = channel;
+    agc = isAgc;
+    statsStart = std::chrono::steady_clock::now();
+  }
+
+  virtual void onSNR(float snr) override
+  {
+    std::lock_guard<std::mutex> lock(statsMutex);
+    snrMin = snrCount ? std::min(snrMin, snr) : snr;
+    snrSum += snr;
+    snrCount++;
+  }
+
+  // called about 5 times per second, independent of the sync state
+  virtual void onFrequencyCorrectorChange(int fine, int coarse) override
+  {
+    std::string text;
+    {
+      std::lock_guard<std::mutex> lock(statsMutex);
+      fineCorrector = fine;
+      coarseCorrector = coarse;
+      if (input) {
+        const float gain = input->getGain();
+        gainMin = gainValid ? std::min(gainMin, gain) : gain;
+        gainMax = gainValid ? std::max(gainMax, gain) : gain;
+        gainValid = true;
+      }
+      text = takeStatsIfDue();
+    }
+    if (!text.empty())
+      logStats(statsLogger, text);
+  }
+
+  // called with true for every synchronized frame, with false when searching for sync
+  virtual void onSyncChange(char isSync) override
+  {
+    std::lock_guard<std::mutex> lock(statsMutex);
+    if (isSync) {
+      syncedFrames++;
+    }
+    else if (synced) {
+      syncLosses++;
+    }
+    synced = isSync;
+  }
+
+  virtual void onFIBDecodeSuccess(bool crcCheckOk, const uint8_t* fib) override
+  {
+    std::lock_guard<std::mutex> lock(statsMutex);
+    fibTotal++;
+    if (crcCheckOk)
+      fibOk++;
+  }
+};
 class PyChannelEventHandler : public ChannelEventHandler {
 protected:
   py::object loop;
@@ -126,6 +337,7 @@ public:
 
   virtual void onSyncChange(char isSync) override 
   { 
+    ChannelEventHandler::onSyncChange(isSync);
     bool syncBool = (bool) isSync;
     RUN_IN_ASYNC(ChannelEventHandler, "on_sync_change", syncBool);
   }
@@ -231,6 +443,8 @@ class DabDevice {
       device->setFrequency(freq);
       device->reset();
 
+      handler.setStatsSource(device, channel, gain == -1);
+
       RadioReceiverOptions rro;
       rx = new RadioReceiver(handler, *device, rro, 1, decodeAudio);
 
@@ -262,6 +476,21 @@ class DabDevice {
 
       py::gil_scoped_release release;
       const Service& sadd = rx->getService(sId);
+
+      std::ostringstream info;
+      info << "Service '" << sadd.serviceLabel.utf8_label() << "' (SId 0x"
+           << std::hex << sId << std::dec << ")";
+      for (const ServiceComponent& sc : rx->getComponents(sadd)) {
+        if (sc.transportMode() == TransportMode::Audio) {
+          const Subchannel sub = rx->getSubchannel(sc);
+          info << " subchannel " << sub.subChId << ", " << sub.bitrate() << " kbit/s, "
+               << sub.protection() << ", "
+               << (sc.audioType() == AudioServiceComponentType::DABPlus ? "DAB+" : "DAB");
+          break;
+        }
+      }
+      handler.setServiceInfo(info.str());
+
       return rx->addServiceToDecode(handler, "", sadd);
     }
 

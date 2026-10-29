@@ -34,6 +34,14 @@
 #include "ofdm-processor.h"
 #include "various/profiling.h"
 #include <iostream>
+
+/**
+ * Frequency error of the receiver oscillator in ppm, as found during the
+ * last reception with a decodable FIC. It is a property of the device, so
+ * it is kept across tunings and scaled to the new frequency, avoiding
+ * a lengthy coarse frequency search on every channel change.
+ */
+static std::atomic<float> lastValidFrequencyErrorPpm(0.0f);
 //
 #define SEARCH_RANGE        (2 * 36)
 #define CORRELATION_LENGTH  24
@@ -121,8 +129,14 @@ void OFDMProcessor::restart()
         threadHandle.join();
     }
 
-    coarseCorrector    = 0;
-    fineCorrector      = 0;
+    const int32_t frequency = input.getFrequency();
+    const int32_t offset = lround(lastValidFrequencyErrorPpm * 1e-6 * frequency);
+    coarseCorrector    = lround((float)offset / params.carrierDiff) * params.carrierDiff;
+    fineCorrector      = offset - coarseCorrector;
+    if (offset != 0) {
+        std::clog << "OFDM-processor: starting with frequency correction " << offset <<
+            " Hz (" << lastValidFrequencyErrorPpm << " ppm)" << std::endl;
+    }
     syncBufferIndex    = 0;
     sLevel             = 0;
     localPhase         = 0;
@@ -415,6 +429,12 @@ SyncOnPhase:
 
             lastValidFineCorrector = fineCorrector;
             lastValidCoarseCorrector = coarseCorrector;
+
+            const int32_t frequency = input.getFrequency();
+            if (frequency > 0) {
+                lastValidFrequencyErrorPpm =
+                    (coarseCorrector + fineCorrector) * 1e6f / frequency;
+            }
         }
 
         allSymbols.resize(params.L);
