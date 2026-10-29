@@ -74,6 +74,7 @@ class OfdmDecoder
         DSPCOMPLEX   *fft_buffer;
         FrequencyInterleaver interleaver;
 
+        std::vector<DSPCOMPLEX> carriers;
         std::vector<softbit_t> ibits;
         int16_t snrCount = 0;
         float snr = 0;

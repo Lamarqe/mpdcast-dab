@@ -41,7 +41,16 @@
 
 #define METRICSHIFT 0
 #define PRECISIONSHIFT  0
-#define RENORMALIZE_THRESHOLD   137
+//  Symbols are mapped onto 0 .. MAXSYM, with an erased (punctured)
+//  softbit landing exactly in the middle, so that it costs the same
+//  for both expected bit values.
+#define MAXSYM  254
+//  Branch metrics add at most RATE * MAXSYM per step and the metric
+//  spread is bounded by START_METRIC + (K - 1) * RATE * MAXSYM, so
+//  renormalizing above this threshold cannot overflow COMPUTETYPE.
+#define RENORMALIZE_THRESHOLD   30000
+//  Initial metric of all states except the (known) start state
+#define START_METRIC    8000
 
 /* ADDSHIFT and SUBSHIFT make sure that the thing returned is a byte. */
 #if (K-1<8)
@@ -163,10 +172,10 @@ Viterbi::Viterbi(int16_t wordlength)
 #endif
 
     for (state = 0; state < NUMSTATES / 2; state++) {
+        BranchIdx[state] = 0;
         for (i = 0; i < RATE; i++) {
-            Branchtab[i * NUMSTATES / 2 + state] =
-                (polys[i] < 0) ^
-                parity((2 * state) & abs (polys[i])) ? 255 : 0;
+            if ((polys[i] < 0) ^ parity((2 * state) & abs (polys[i])))
+                BranchIdx[state] |= 1 << i;
         }
     }
 
@@ -222,7 +231,7 @@ uint8_t getbit (uint8_t v, int32_t o)
 //}
 
 //  Note that our DAB environment maps the softbits to -127 .. 127
-//  we have to map that onto 0 .. 255
+//  we have to map that onto 0 .. MAXSYM
 
 void Viterbi::deconvolve(softbit_t *input, uint8_t *output)
 {
@@ -232,7 +241,7 @@ void Viterbi::deconvolve(softbit_t *input, uint8_t *output)
     for (i = 0; i < (uint16_t)(frameBits + (K - 1)) * RATE; i ++) {
         int16_t temp = ((int16_t)input[i]) + 127;
         if (temp < 0) temp = 0;
-        if (temp > 255) temp = 255;
+        if (temp > MAXSYM) temp = MAXSYM;
         symbols[i] = temp;
     }
 
@@ -245,23 +254,18 @@ void Viterbi::deconvolve(softbit_t *input, uint8_t *output)
 }
 
 /* C-language butterfly */
-void Viterbi::BFLY(
+inline void Viterbi::BFLY(
         int i,
         int s,
-        COMPUTETYPE * syms,
         struct v * vp,
         decision_t * d)
 {
-    int32_t j, decision0, decision1;
+    int32_t decision0, decision1;
     COMPUTETYPE metric,m0,m1,m2,m3;
 
-    metric =0;
-    for (j = 0; j < RATE;j++)
-        metric += (Branchtab[i + j * NUMSTATES/2] ^ syms[s*RATE+j]) >>
-            METRICSHIFT ;
-    metric = metric >> PRECISIONSHIFT;
+    metric = BranchMetric[BranchIdx[i]];
     const COMPUTETYPE max =
-        ((RATE * ((256 - 1) >> METRICSHIFT)) >> PRECISIONSHIFT);
+        ((RATE * (MAXSYM >> METRICSHIFT)) >> PRECISIONSHIFT);
 
     m0 = vp->old_metrics->t[i] + metric;
     m1 = vp->old_metrics->t[i + NUMSTATES / 2] + (max - metric);
@@ -296,8 +300,18 @@ void Viterbi::update_viterbi_blk_GENERIC(
 
     for (s = 0; s < nbits; s++) {
         void *tmp;
+        //  The branch metric only depends on the RATE expected bits,
+        //  so compute it once per bit for all combinations
+        for (int c = 0; c < (1 << RATE); c++) {
+            COMPUTETYPE metric = 0;
+            for (int j = 0; j < RATE; j++) {
+                const COMPUTETYPE sym = syms[s * RATE + j];
+                metric += ((c >> j) & 1 ? MAXSYM - sym : sym) >> METRICSHIFT;
+            }
+            BranchMetric[c] = metric >> PRECISIONSHIFT;
+        }
         for (i = 0; i < NUMSTATES / 2; i++) {
-            BFLY (i, s, syms, vp, vp->decisions);
+            BFLY (i, s, vp, vp->decisions);
         }
 
         renormalize (vp->new_metrics -> t, RENORMALIZE_THRESHOLD);
@@ -345,7 +359,7 @@ void Viterbi::init_viterbi(struct v *p, int16_t starting_state)
     int32_t i;
 
     for (i = 0; i < NUMSTATES; i++)
-        vp->metrics1.t[i] = 63;
+        vp->metrics1.t[i] = START_METRIC;
 
     vp->old_metrics = &vp -> metrics1;
     vp->new_metrics = &vp -> metrics2;

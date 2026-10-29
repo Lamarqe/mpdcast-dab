@@ -46,7 +46,11 @@ class Viterbi
 
     private:
         struct v    vp;
-        COMPUTETYPE Branchtab   [NUMSTATES / 2 * RATE] __attribute__ ((aligned (16)));
+        //  Bit j of BranchIdx[state] is the expected output bit of polynomial j
+        uint8_t     BranchIdx   [NUMSTATES / 2];
+        //  Branch metric for each of the 2^RATE expected output combinations,
+        //  recomputed for every decoded bit
+        COMPUTETYPE BranchMetric [1 << RATE];
         //  int parityb     (uint8_t);
         int parity(int x);
         void partab_init (void);
@@ -62,7 +66,7 @@ class Viterbi
                                 int16_t nbits, /* Number of data bits */
                                 uint16_t endstate); /*Terminal encoder state */
 
-        void BFLY( int i, int s, COMPUTETYPE * syms, struct v * vp, decision_t * d);
+        void BFLY( int i, int s, struct v * vp, decision_t * d);
 
         uint8_t *data;
         COMPUTETYPE *symbols;

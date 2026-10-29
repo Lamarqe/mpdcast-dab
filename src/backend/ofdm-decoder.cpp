@@ -32,6 +32,15 @@
 #include "various/profiling.h"
 #include <iostream>
 
+static inline softbit_t to_softbit(DSPFLOAT v)
+{
+    if (v > 127.0f)
+        return 127;
+    if (v < -127.0f)
+        return -127;
+    return static_cast<softbit_t>(v);
+}
+
 /**
  * \brief OfdmDecoder
  * The class OfdmDecoder is - when implemented in a separate thread -
@@ -52,6 +61,7 @@ OfdmDecoder::OfdmDecoder(
     phaseReference(params.T_u),
     fft_handler(p.T_u),
     interleaver(p),
+    carriers(params.K),
     ibits(2 * params.K)
 {
     T_g = params.T_s - params.T_u;
@@ -195,6 +205,7 @@ void OfdmDecoder::decodeDataSymbol(int32_t sym_ix)
      * Note that from here on, we are only interested in the
      * K useful carriers of the FFT output
      */
+    DSPFLOAT sum_l1 = 0;
     for (int16_t i = 0; i < params.K; i ++) {
         int16_t index = interleaver.mapIn(i);
         if (index < 0)
@@ -207,15 +218,27 @@ void OfdmDecoder::decodeDataSymbol(int32_t sym_ix)
          */
         const DSPCOMPLEX r1 = fft_buffer[index] * conj (phaseReference[index]);
         phaseReference[index] = fft_buffer[index];
-        const DSPFLOAT ab1 = 127.0f / l1_norm(r1);
-        /// split the real and the imaginary part and scale it
-
-        ibits[i]            = -real (r1) * ab1;
-        ibits[params.K + i] = -imag (r1) * ab1;
+        carriers[i] = r1;
+        sum_l1 += l1_norm(r1);
 
         if (i % constellationDecimation == 0) {
             constellationPoints.push_back(r1);
         }
+    }
+
+    /**
+     * Scale all carriers of the symbol by a common factor derived from
+     * the mean carrier magnitude. The magnitude of r1 then acts as
+     * reliability information for the viterbi decoder: carriers hit
+     * by a fade or noise give weak softbits instead of full-scale ones.
+     * The factor 1.5 places the mean carrier at roughly 2/3 of full scale.
+     */
+    const DSPFLOAT mean_l1 = sum_l1 / params.K;
+    const DSPFLOAT scale = mean_l1 > 0 ? 127.0f / (1.5f * mean_l1) : 0;
+    for (int16_t i = 0; i < params.K; i ++) {
+        /// split the real and the imaginary part and scale it
+        ibits[i]            = to_softbit(-real (carriers[i]) * scale);
+        ibits[params.K + i] = to_softbit(-imag (carriers[i]) * scale);
     }
 
     if (sym_ix < 4) {
